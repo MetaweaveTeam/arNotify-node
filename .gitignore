@@ -1,0 +1,8 @@
+# npm
+node_modules
+
+# express
+dist
+
+# env
+.env
