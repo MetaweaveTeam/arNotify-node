@@ -18,6 +18,10 @@ DB_PASSWORD=arnotify
 DB_ROOT_PASSWORD=arnotify
 ```
 
+or
+
+`$ cp .env.template .env`
+
 ### Database configuration
 
 #### Docker
