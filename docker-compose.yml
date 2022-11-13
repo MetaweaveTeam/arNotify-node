@@ -4,18 +4,28 @@ services:
     image: mysql:8.0
     restart: always
     environment:
-      MYSQL_DATABASE: "${DB_NAME}"
-      MYSQL_USER: "${DB_USER}"
-      MYSQL_PASSWORD: "${DB_PASSWORD}"
-      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD}"
+      MYSQL_DATABASE: arnotify
+      MYSQL_USER: arnotify_user
+      MYSQL_PASSWORD: arnotify_password
+      MYSQL_ROOT_PASSWORD: arnotify_root_password
     ports:
       - '3306:3306'
-    expose:
-      - '3306'
     volumes:
-      - arnotify-db:/var/lib/mysql
-      - ./data/mysql:/var/lib/mysql
+      - mysql:/var/lib/mysql
+  
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:5
+    restart: always
+    environment:
+      PMA_PORT: 3306
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: arnotify_root_password
+    ports:
+      - 4000:80
+    depends_on: 
+      - db
 
 volumes:
-  arnotify-db:
+  mysql:
 

@@ -1,22 +1,20 @@
-import dotenv from 'dotenv';
-
-dotenv.config();
-
 const mysql = require('mysql2');
+const env = process.env
 
 const connection = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  host: env.DB_HOST,
+  port: env.DB_PORT,
+  user: env.DB_USER,
+  password: env.DB_PASSWORD,
+  database: env.DB_NAME,
 });
 
 connection.connect((err: any) => {
   if (err) {
-    console.error('error connecting: ' + err.stack);
-    return;
+    console.error('❌[mysql]: error connecting: ' + err.stack);
+    process.exit()
   }
-  console.log('connected as id ' + connection.threadId);
+  console.log(`⚡️[mysql]: connected as id ${connection.threadId} at ${env.DB_HOST}:${env.DB_PORT}`);
 });
 
 export default connection;

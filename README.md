@@ -1,39 +1,22 @@
-# arNotify node
+# arNotify-node
+
+Node server for [arNotify](https://github.com/MetaweaveTeam/arNotify)
+
+**Development environment:** You'll need docker and docker-compose installed on your system.
 
 ## Getting started
 
-**Note:** For this project you need to have docker installed or use your own mysql database at `.env`
+1. `$ git clone git@github.com:MetaweaveTeam/arNotify-node.git && cd arNotify-node`
+2. `$ npm install`
+3. `$ npm start`
 
-### Configuring .env
+You'll have the following services running:
+- express server: localhost:3000
+- phpmyadmin: localhost:4000
+- mysql server: localhost:3306
 
-By default the .env value are configured for docker.
-Here is the default `.env.template`
+## Stop all containers
 
-```sh
-PORT=8000
-DB_HOST=127.0.0.1
-DB_NAME=arnotify
-DB_USER=arnotify
-DB_PASSWORD=arnotify
-DB_ROOT_PASSWORD=arnotify
-```
+`$ npm stop`
 
-or
-
-`$ cp .env.template .env`
-
-### Database configuration
-
-#### Docker
-
-- `$ docker compose up`
-
-#### MySQL / MariaDB
-
-**Note:** Coming Soon
-
-### Starting Dev Server
-
-- `$ npm i`
-
-- `$ npm dev`
+This will stop the mysql and phpmyadmin server containers

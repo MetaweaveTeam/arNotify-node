@@ -4,9 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "docker-compose up -d && dotenv -e .env.dev -- ts-node-dev src",
+    "stop": "docker-compose down",
     "build": "npx tsc",
-    "start": "node dist/index.js",
-    "dev": "concurrently \"npx tsc --watch\" \"nodemon -q dist/index.js\""
+    "stage": "npx tsc && cp .env.stage dist/.env && dotenv -e dist/.env -- node dist/index.js",
+    "production": "echo to be done by cromatikap"
   },
   "repository": {
     "type": "git",
@@ -20,15 +22,21 @@
   },
   "homepage": "https://github.com/MetaweaveTeam/arNotify-node#readme",
   "dependencies": {
-    "dotenv": "^16.0.3",
+    "cli-color": "^2.0.3",
+    "cors": "^2.8.5",
     "express": "^4.18.2",
+    "helmet": "^6.0.0",
     "mysql2": "^2.3.3"
   },
   "devDependencies": {
+    "@types/cli-color": "^2.0.2",
+    "@types/cors": "^2.8.12",
     "@types/express": "^4.17.14",
     "@types/node": "^18.11.9",
     "concurrently": "^7.5.0",
+    "dotenv-cli": "^6.0.0",
     "nodemon": "^2.0.20",
+    "ts-node-dev": "^2.0.0",
     "typescript": "^4.8.4"
   }
 }
