@@ -4,8 +4,10 @@ import cors from "cors";
 const morgan = require("morgan");
 import type { ErrorRequestHandler } from "express";
 import { Request } from "express";
+import { UserCookie } from "../types";
 const session = require("express-session");
 require("dotenv").config();
+const cookieParser = require("cookie-parser");
 
 const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   console.log(err);
@@ -24,9 +26,9 @@ let sess = {
   saveUninitialized: true,
   cookie: {
     secure: false,
-    // httpOnly: true,
+    httpOnly: true,
     // sameSite: true,
-    // signed: true
+    signed: true,
   },
   maxAge: 8 * 60 * 60 * 1000, // 8 hours
 };
@@ -36,7 +38,7 @@ if (process.env.MODE === "production") {
   sess.cookie.secure = true; // serve secure cookies
 }
 app.use(session(sess));
-
+app.use(cookieParser(process.env.SESSION_SECRET));
 app.use(helmet()); // set security HTTP headers
 app.use(express.json()); // parse json request body
 app.use(express.urlencoded({ extended: true })); // parse urlencoded request body
@@ -47,11 +49,12 @@ app.use(cors());
 if (process.env.MODE === "production") app.options("arweave.net", cors());
 else app.options("localhost:*", cors());
 
-export function getCookie(req: Request, cookieName: String) {
+export function getCookie(req: Request, cookieName: String): UserCookie {
+  console.log(req.cookies);
   let cookies = req.signedCookies[cookieName as any];
   if (Array.isArray(cookies)) {
-    return cookies[0];
-  } else return cookies;
+    return cookies[0] as UserCookie;
+  } else return cookies as UserCookie;
 }
 
 export default app;

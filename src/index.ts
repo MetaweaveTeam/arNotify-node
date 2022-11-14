@@ -2,8 +2,19 @@ import { welcome, env, app, db } from "./config";
 import { Request, Response } from "express";
 import { getCookie } from "./config/http";
 import { TwitterApi } from "twitter-api-v2";
+import { encrypt } from "./crypto";
+import { Subscription, User, UserCookie } from "./types";
+const Arweave = require("arweave");
+
 const OAUTH_COOKIE = "oauth_token";
 const USER_COOKIE = "user_cookie";
+const protocol = "argora";
+
+const arweave = Arweave.init({
+  host: "arweave.net",
+  port: 443,
+  protocol: "https",
+});
 
 interface RequestWithSession extends Request {
   session: any;
@@ -18,10 +29,11 @@ const client = new TwitterApi({
 });
 welcome();
 
-app.get("/", (req: Request, res: Response) => {
+app.get("/", async (req: Request, res: Response) => {
   res.send("");
 });
 
+// TODO remove
 app.get("/users", async (req: RequestWithSession, res: Response) => {
   let result = await db.fetchAllSubscribedUsers();
   res.send(result);
@@ -44,14 +56,12 @@ app.post(
         if (err) next(err);
       });
 
-      console.log(req.session);
-
       res.cookie(OAUTH_COOKIE, oauth_token, {
         maxAge: 15 * 60 * 1000, // 15 minutes
         // secure: true,
-        // httpOnly: true,
+        httpOnly: true,
         // sameSite: true,
-        // signed: true,
+        signed: true,
       });
 
       res.json({ oauth_token, url });
@@ -93,48 +103,167 @@ app.post(
       // loggedClient is an authenticated client in behalf of some user
       // Store accessToken & accessSecret somewhere
 
-      let user = await loggedClient.currentUser();
-      console.log(user);
+      let twitterUserData = await loggedClient.currentUser();
+
+      let user: User;
+
+      let dbUser = await db.fetchUserInfoByTwitterID(twitterUserData.id_str);
+      let encAccessToken = encrypt(accessToken);
+      let encTokenSecret = encrypt(accessSecret);
+
+      if (dbUser.length === 0) {
+        let res = await db.createNewUser({
+          twitter_id: twitterUserData.id_str,
+          twitter_handle: twitterUserData.screen_name,
+          photo_url: twitterUserData.profile_image_url_https,
+          oauth_access_token: encAccessToken.content,
+          oauth_access_token_iv: encAccessToken.iv,
+          oauth_secret_token: encTokenSecret.content,
+          oauth_secret_token_iv: encTokenSecret.iv,
+        });
+        if (res.length === 0) {
+          res.status(500).json({ error: "something went wrong" });
+        }
+        user = res[0];
+      } else {
+        user = dbUser[0];
+        user.oauth_access_token = encAccessToken.content;
+        user.oauth_access_token_iv = encAccessToken.iv;
+        user.oauth_secret_token = encTokenSecret.content;
+        user.oauth_secret_token_iv = encTokenSecret.iv;
+        await db.updateUserInfo(user);
+      }
+      res.cookie(
+        USER_COOKIE,
+        {
+          twitter_id: user.twitter_id,
+          twitter_handle: user.twitter_handle,
+          photo_url: user.photo_url,
+          logged_in_method: "twitter",
+        } as UserCookie,
+        {
+          maxAge: 8 * 60 * 60 * 1000, // 8 hours
+          // secure: true,
+          httpOnly: true,
+          // sameSite: true,
+          signed: true,
+        }
+      );
+      res.status(200).json({
+        twitter_id: user.twitter_id,
+        twitter_handle: user.twitter_handle,
+        photo_url: user.photo_url,
+        expiry: Date.now() + 8 * 60 * 60 * 1000,
+      });
     } catch (e: any) {
+      console.error(e);
       res.status(403).send("Invalid verifier or access tokens!");
     }
   }
 );
 
 //Authenticated resource access
-app.get("/twitter/users/profile_banner", async (req, res) => {
+app.get("/twitter/users/me", async (req, res) => {
   try {
-    const user = getCookie(req, USER_COOKIE);
+    const userCookie = getCookie(req, USER_COOKIE);
 
-    let userInfo = await db.fetchUserInfoByTwitterID(user.twitter_id);
+    let userInfo = await db.fetchUserInfoByTwitterID(userCookie.twitter_id);
+    if (userInfo.length === 0) {
+      res.status(500).json({ error: "internal error" });
+      return;
+    }
 
+    let user = userInfo[0];
     res.status(200).json({
-      twitter_id: userInfo.twitter_id,
-      twitter_handle: userInfo.twitter_handle,
-      arweave_address: userInfo.arweave_address,
-      is_subscribed: userInfo.is_subscribed,
-      photo_url: userInfo.photo_url,
+      twitter_id: user.twitter_id,
+      twitter_handle: user.twitter_handle,
+      is_subscribed: user.is_subscribed,
+      photo_url: user.photo_url,
     });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(403).json({ message: "Missing, invalid, or expired tokens" });
   }
 });
 
-app.post("/twitter/subscribe", async (req, res) => {});
+app.post("/twitter/subscribe", async (req, res) => {
+  try {
+    let data = req.body;
+    const user = getCookie(req, USER_COOKIE);
 
-app.post("/twitter/unsubscribe", async (req, res) => {});
+    // first check if we are already subscribed
+    let sub = await db.subscription(user.twitter_id, data.address, protocol);
+    if (sub.length > 0) {
+      res
+        .status(200)
+        .json({ subscribed: true, address: data.address, protocol });
+      return;
+    }
 
-app.post("/twitter/logout", async (req, res) => {
+    const blockHeight = (await arweave.blocks.getCurrent()).height;
+
+    await db.subscribe(user.twitter_id, data.address, protocol, blockHeight);
+
+    res
+      .status(200)
+      .json({ subscribed: true, address: data.address, protocol: protocol });
+  } catch (error) {
+    console.error(error);
+    res.status(403).json({ message: "Missing, invalid, or expired tokens" });
+  }
+});
+
+app.post("/twitter/unsubscribe", async (req, res) => {
+  try {
+    const user = getCookie(req, USER_COOKIE);
+    let data = req.body;
+
+    let sub = await db.subscription(user.twitter_id, data.address, protocol);
+
+    if (sub.length === 0) {
+      res.status(400).json({ error: "sub not found" });
+      return;
+    }
+
+    await db.unsubscribe(user.twitter_id, data.address, protocol);
+
+    res.json({ subscribed: false, address: data.address, protocol: protocol });
+    return;
+  } catch (error) {
+    console.error(error);
+    res.status(403).json({ message: "Missing, invalid, or expired tokens" });
+  }
+});
+
+app.get("/subscriptions", async (req, res) => {
+  try {
+    const user = getCookie(req, USER_COOKIE);
+    let result = await db.subscriptionsByUserID(user.twitter_id);
+
+    res.status(200).send({ subscriptions: result as Subscription[] });
+    return;
+  } catch (e) {
+    res.status(404).json({ message: "Problem fetching subscriptions" });
+  }
+});
+
+// exit actually removes the twitter connection and logs out the user
+app.post("/twitter/exit", async (req, res) => {
   try {
     const user = getCookie(req, USER_COOKIE);
 
-    user.oauth_access_token = "";
-    user.oauth_access_token_iv = "";
-    user.oauth_secret_token = "";
-    user.oauth_secret_token_iv = "";
+    await db.removeTwitterAccess(user.twitter_id);
 
-    await db.updateUserInfo(user);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(403).json({ message: "Missing, invalid, or expired tokens" });
+  }
+});
+
+// logout simply logs you out of the app, keeps the twitter connection
+app.post("/logout", async (req, res) => {
+  try {
+    const user = getCookie(req, USER_COOKIE);
 
     res.cookie(OAUTH_COOKIE, {}, { maxAge: -1 });
     res.cookie(USER_COOKIE, {}, { maxAge: -1 });

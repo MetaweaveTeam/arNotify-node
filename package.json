@@ -23,7 +23,9 @@
   "homepage": "https://github.com/MetaweaveTeam/arNotify-node#readme",
   "dependencies": {
     "@types/express-session": "^1.17.5",
+    "arweave": "^1.11.6",
     "cli-color": "^2.0.3",
+    "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "express": "^4.18.2",
