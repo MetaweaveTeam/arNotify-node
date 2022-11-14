@@ -1,20 +1,31 @@
-const mysql = require('mysql2');
-const env = process.env
+const mariadb = require("mariadb");
+const env = process.env;
 
-const connection = mysql.createConnection({
+const pool = mariadb.createPool({
   host: env.DB_HOST,
   port: env.DB_PORT,
   user: env.DB_USER,
   password: env.DB_PASSWORD,
   database: env.DB_NAME,
+  connectionLimit: 5,
 });
 
-connection.connect((err: any) => {
-  if (err) {
-    console.error('❌[mysql]: error connecting: ' + err.stack);
-    process.exit()
+async function ensure_connected() {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.query("SELECT 1 as val");
+    console.log(
+      `⚡️[mariadb]: connected as id ${conn.threadId} at ${env.DB_HOST}:${env.DB_PORT}`
+    );
+  } catch (err) {
+    console.log("❌[mariadb]: error connecting:  " + err);
+    process.exit(1);
   }
-  console.log(`⚡️[mysql]: connected as id ${connection.threadId} at ${env.DB_HOST}:${env.DB_PORT}`);
-});
+}
 
-export default connection;
+(async () => {
+  return await ensure_connected();
+})();
+
+export default pool;

@@ -1,17 +1,18 @@
 version: '3.7'
 services:
   db:
-    image: mysql:8.0
+    image: mariadb:10.9
     restart: always
     environment:
-      MYSQL_DATABASE: arnotify
-      MYSQL_USER: arnotify_user
-      MYSQL_PASSWORD: arnotify_password
-      MYSQL_ROOT_PASSWORD: arnotify_root_password
+      MARIADB_DATABASE: arnotify
+      MARIADB_USER: arnotify_user
+      MARIADB_PASSWORD: arnotify_password
+      MARIADB_ROOT_PASSWORD: arnotify_root_password
     ports:
       - '3306:3306'
     volumes:
-      - mysql:/var/lib/mysql
+      - mariadb:/var/lib/mariadb
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
   
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:5
@@ -27,5 +28,5 @@ services:
       - db
 
 volumes:
-  mysql:
+  mariadb:
 
