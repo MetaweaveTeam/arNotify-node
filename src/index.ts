@@ -3,12 +3,18 @@ import { Request, Response } from "express";
 import { getCookie } from "./config/http";
 import { TwitterApi } from "twitter-api-v2";
 import { encrypt } from "./crypto";
-import { Subscription, User, UserCookie } from "./types";
-const Arweave = require("arweave");
-
-const OAUTH_COOKIE = "oauth_token";
-const USER_COOKIE = "user_cookie";
-const protocol = "argora";
+import start from "./cron";
+import {
+  APP_KEY,
+  APP_SECRET,
+  OAUTH_COOKIE,
+  PROTOCOL,
+  Subscription,
+  User,
+  UserCookie,
+  USER_COOKIE,
+} from "./types";
+import Arweave from "arweave";
 
 const arweave = Arweave.init({
   host: "arweave.net",
@@ -20,23 +26,14 @@ interface RequestWithSession extends Request {
   session: any;
 }
 
-let appKey = process.env.CONSUMER_KEY || "INVALID";
-let appSecret = process.env.CONSUMER_SECRET || "INVALID";
-
 const client = new TwitterApi({
-  appKey: appKey,
-  appSecret: appSecret,
+  appKey: APP_KEY,
+  appSecret: APP_SECRET,
 });
 welcome();
 
 app.get("/", async (req: Request, res: Response) => {
   res.send("");
-});
-
-// TODO remove
-app.get("/users", async (req: RequestWithSession, res: Response) => {
-  let result = await db.fetchAllSubscribedUsers();
-  res.send(result);
 });
 
 // OAuth Step 1
@@ -89,8 +86,8 @@ app.post(
       // Obtain the persistent tokens
       // Create a client from temporary tokens
       const client = new TwitterApi({
-        appKey: appKey,
-        appSecret: appSecret,
+        appKey: APP_KEY,
+        appSecret: APP_SECRET,
         accessToken: oauth_token as string,
         accessSecret: oauth_token_secret as string,
       });
@@ -192,21 +189,26 @@ app.post("/twitter/subscribe", async (req, res) => {
     const user = getCookie(req, USER_COOKIE);
 
     // first check if we are already subscribed
-    let sub = await db.subscription(user.twitter_id, data.address, protocol);
+    let sub = await db.subscription(user.twitter_id, data.address, PROTOCOL);
     if (sub.length > 0) {
       res
         .status(200)
-        .json({ subscribed: true, address: data.address, protocol });
+        .json({ subscribed: true, address: data.address, protocol: PROTOCOL });
       return;
     }
 
     const blockHeight = (await arweave.blocks.getCurrent()).height;
 
-    await db.subscribe(user.twitter_id, data.address, protocol, blockHeight);
+    await db.subscribe(
+      user.twitter_id,
+      data.address,
+      PROTOCOL,
+      blockHeight.toString()
+    );
 
     res
       .status(200)
-      .json({ subscribed: true, address: data.address, protocol: protocol });
+      .json({ subscribed: true, address: data.address, protocol: PROTOCOL });
   } catch (error) {
     console.error(error);
     res.status(403).json({ message: "Missing, invalid, or expired tokens" });
@@ -218,16 +220,16 @@ app.post("/twitter/unsubscribe", async (req, res) => {
     const user = getCookie(req, USER_COOKIE);
     let data = req.body;
 
-    let sub = await db.subscription(user.twitter_id, data.address, protocol);
+    let sub = await db.subscription(user.twitter_id, data.address, PROTOCOL);
 
     if (sub.length === 0) {
       res.status(400).json({ error: "sub not found" });
       return;
     }
 
-    await db.unsubscribe(user.twitter_id, data.address, protocol);
+    await db.unsubscribe(user.twitter_id, data.address, PROTOCOL);
 
-    res.json({ subscribed: false, address: data.address, protocol: protocol });
+    res.json({ subscribed: false, address: data.address, protocol: PROTOCOL });
     return;
   } catch (error) {
     console.error(error);
@@ -273,6 +275,10 @@ app.post("/logout", async (req, res) => {
   }
 });
 
+// we start the cron job
+start();
+
+// we listen to incoming requests
 app.listen(env.PORT, () => {
   console.log(`⚡️[server]: Listening on http://localhost:${env.PORT}`);
 });

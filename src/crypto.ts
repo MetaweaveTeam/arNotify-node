@@ -1,13 +1,17 @@
-const cryptojs = require("crypto");
-require("dotenv").config();
+import crypto from "crypto";
+import * as dotenv from "dotenv";
+import { ENCRYPTION_ALGO, ENCRYPTION_SECRET_KEY } from "./types";
+dotenv.config();
 
-const algorithm = "aes-256-ctr";
-const secretKey = process.env.ENCRYPTION_KEY;
+export function encrypt(text: string) {
+  const iv = crypto.randomBytes(16);
 
-export function encrypt(text: String) {
-  const iv = cryptojs.randomBytes(16);
-
-  const cipher = cryptojs.createCipheriv(algorithm, secretKey, iv);
+  const cipher = crypto.createCipheriv(
+    ENCRYPTION_ALGO,
+    ENCRYPTION_SECRET_KEY,
+    iv,
+    {}
+  );
 
   const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
 
@@ -18,9 +22,9 @@ export function encrypt(text: String) {
 }
 
 export function decrypt(content: String, iv: String) {
-  const decipher = cryptojs.createDecipheriv(
-    algorithm,
-    secretKey,
+  const decipher = crypto.createDecipheriv(
+    ENCRYPTION_ALGO,
+    ENCRYPTION_SECRET_KEY,
     Buffer.from(iv, "hex")
   );
 

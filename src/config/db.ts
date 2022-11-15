@@ -1,11 +1,11 @@
 import { User } from "../types";
 
-const mariadb = require("mariadb");
+import mariadb from "mariadb";
 const env = process.env;
 
 const pool = mariadb.createPool({
   host: env.DB_HOST,
-  port: env.DB_PORT,
+  port: env.DB_PORT ? +env.DB_PORT : 3306,
   user: env.DB_USER,
   password: env.DB_PASSWORD,
   database: env.DB_NAME,
@@ -24,7 +24,7 @@ async function ensure_connected() {
     console.log("❌[mariadb]: error connecting:  " + err);
     process.exit(1);
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 }
 
@@ -38,16 +38,28 @@ async function query(q: string, args: any[]): Promise<any> {
     conn = await pool.getConnection();
     return await conn.query(q, args);
   } catch (e: any) {
+    if (conn) conn.release();
     throw e;
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 }
 
 export default {
   fetchAllSubscribedUsers: async () => {
     return await query(
-      "SELECT u.* FROM users u JOIN subscriptions s ON u.twitter_id = s.twitter_id WHERE s.is_active = 1 ",
+      `SELECT
+      u.*,
+      s.arweave_address,
+      s.protocol_name,
+      s.from_block_height,
+      s.is_active
+  FROM
+      users u
+  JOIN subscriptions s ON
+      u.twitter_id = s.twitter_id
+  WHERE
+      s.is_active = 1 `,
       []
     );
   },
@@ -188,10 +200,15 @@ export default {
     );
   },
 
-  saveTweetInfo: async (user: User, arweave_tx_id: String, tweetID: String) => {
+  saveTweetInfo: async (
+    twitterID: String,
+    tweetID: String,
+    arweave_tx_id: String,
+    protocol: String
+  ) => {
     return await query(
-      "INSERT INTO tweets (twitter_id, tweet_id, arweave_tx_id) VALUES (?, ?, ?)",
-      [user.twitter_id, arweave_tx_id, tweetID]
+      "INSERT INTO tweets (twitter_id, tweet_id, arweave_tx_id, protocol_name) VALUES (?, ?, ?, ?)",
+      [twitterID, tweetID, arweave_tx_id, protocol]
     );
   },
 };

@@ -1,13 +1,14 @@
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
-const morgan = require("morgan");
+import morgan from "morgan";
 import type { ErrorRequestHandler } from "express";
 import { Request } from "express";
 import { UserCookie } from "../types";
-const session = require("express-session");
-require("dotenv").config();
-const cookieParser = require("cookie-parser");
+import session from "express-session";
+import * as dotenv from "dotenv";
+dotenv.config();
+import cookieParser from "cookie-parser";
 
 const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   console.log(err);
@@ -37,7 +38,7 @@ if (process.env.MODE === "production") {
   app.set("trust proxy", 1); // trust first proxy
   sess.cookie.secure = true; // serve secure cookies
 }
-app.use(session(sess));
+app.use(session(sess as any));
 app.use(cookieParser(process.env.SESSION_SECRET));
 app.use(helmet()); // set security HTTP headers
 app.use(express.json()); // parse json request body

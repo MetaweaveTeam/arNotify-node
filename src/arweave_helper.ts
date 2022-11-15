@@ -1,4 +1,6 @@
-const gql = require("graphql-request").gql;
+import { PROTOCOL } from "./types";
+
+import { gql } from "graphql-request";
 
 export = {
   argoraQuery: (addresses: [String], minBlockHeight: number) => gql`
@@ -6,9 +8,9 @@ export = {
     transactions(
       sort: HEIGHT_DESC
       tags: [
-        { name: "App-Name", values: ["argora"] }
+        { name: "Protocol-Name", values: ["${PROTOCOL}"] }
         { name: "reply-to", values: ["world", "profile"] }
-        { name: "App-Version", values: ["1.0", "1.1"] }
+        { name: "Protocol-Version", values: ["1.0", "1.1", "1.2-beta"] }
       ]
       block: {min: ${minBlockHeight}, max: 1000000000}
       owners: ${JSON.stringify(addresses)}
