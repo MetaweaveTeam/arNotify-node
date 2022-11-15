@@ -50,14 +50,17 @@ app.post(
 
       req.session.oauth_token_secret = oauth_token_secret;
       req.session.save(function (err: any) {
-        if (err) next(err);
+        if (err) {
+          console.log(err);
+          next(err);
+        }
       });
 
       res.cookie(OAUTH_COOKIE, oauth_token, {
         maxAge: 15 * 60 * 1000, // 15 minutes
-        // secure: true,
+        secure: true,
         httpOnly: true,
-        // sameSite: true,
+        sameSite: "none", // to make it work for now
         signed: true,
       });
 
@@ -140,9 +143,9 @@ app.post(
         } as UserCookie,
         {
           maxAge: 8 * 60 * 60 * 1000, // 8 hours
-          // secure: true,
+          secure: true,
           httpOnly: true,
-          // sameSite: true,
+          sameSite: "none", // to make it work for now
           signed: true,
         }
       );
@@ -218,6 +221,7 @@ app.post("/twitter/subscribe", async (req, res) => {
 app.post("/twitter/unsubscribe", async (req, res) => {
   try {
     const user = getCookie(req, USER_COOKIE);
+
     let data = req.body;
 
     let sub = await db.subscription(user.twitter_id, data.address, PROTOCOL);
@@ -240,6 +244,7 @@ app.post("/twitter/unsubscribe", async (req, res) => {
 app.get("/subscriptions", async (req, res) => {
   try {
     const user = getCookie(req, USER_COOKIE);
+
     let result = await db.subscriptionsByUserID(user.twitter_id);
 
     res.status(200).send({ subscriptions: result as Subscription[] });
@@ -267,8 +272,28 @@ app.post("/logout", async (req, res) => {
   try {
     const user = getCookie(req, USER_COOKIE);
 
-    res.cookie(OAUTH_COOKIE, {}, { maxAge: -1 });
-    res.cookie(USER_COOKIE, {}, { maxAge: -1 });
+    res.cookie(
+      OAUTH_COOKIE,
+      {},
+      {
+        maxAge: -1,
+        secure: true,
+        httpOnly: true,
+        sameSite: "none", // to make it work for now
+        signed: true,
+      }
+    );
+    res.cookie(
+      USER_COOKIE,
+      {},
+      {
+        maxAge: -1,
+        secure: true,
+        httpOnly: true,
+        sameSite: "none", // to make it work for now
+        signed: true,
+      }
+    );
     res.json({ success: true });
   } catch (error) {
     res.status(403).json({ message: "Missing, invalid, or expired tokens" });
