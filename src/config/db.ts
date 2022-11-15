@@ -57,7 +57,7 @@ export default {
   FROM
       users u
   JOIN subscriptions s ON
-      u.twitter_id = s.twitter_id
+      u.main_id = s.main_id
   WHERE
       s.is_active = 1 `,
       []
@@ -65,14 +65,15 @@ export default {
   },
 
   fetchUserInfoByTwitterID: async (twitterID: String) => {
-    return await query("SELECT * FROM users where users.twitter_id=?", [
-      twitterID,
-    ]);
+    return await query(
+      "SELECT * FROM users where users.main_id=? AND medium='twitter'",
+      [twitterID]
+    );
   },
 
   subscriptionsByUserID: async (twitterID: String) => {
     return await query(
-      "SELECT * FROM subscriptions s where s.twitter_id=? and s.is_active=1",
+      "SELECT * FROM subscriptions s where s.main_id=? and s.is_active=1",
       [twitterID]
     );
   },
@@ -88,7 +89,7 @@ export default {
   FROM
       subscriptions s
   WHERE
-      s.twitter_id = ? AND s.arweave_address = ? AND s.protocol_name = ? AND s.is_active = 1`,
+      s.main_id = ? AND s.arweave_address = ? AND s.protocol_name = ? AND s.is_active = 1`,
       [twitterID, arweave_address, protocol]
     );
   },
@@ -101,7 +102,7 @@ export default {
   ): Promise<Boolean> => {
     return await query(
       `INSERT INTO subscriptions(
-        twitter_id,
+        main_id,
         arweave_address,
         protocol_name,
         from_block_height,
@@ -124,7 +125,7 @@ export default {
   SET
       is_active = 0
   WHERE
-      s.twitter_id = ? AND s.arweave_address = ? AND s.protocol_name = ?
+      s.main_id = ? AND s.arweave_address = ? AND s.protocol_name = ?
       `,
       [twitterID, arweave_address, protocol]
     );
@@ -139,18 +140,20 @@ export default {
   createNewUser: async (user: User) => {
     return await query(
       `INSERT INTO users(
-        twitter_id,
-        twitter_handle,
+        main_id,
+        main_handle,
+        medium,
         photo_url,
         oauth_access_token,
         oauth_access_token_iv,
         oauth_secret_token,
         oauth_secret_token_iv
     )
-    VALUES(?, ?, ?, ?, ?, ?, ?) RETURNING twitter_id, twitter_handle, photo_url`,
+    VALUES(?, ?, ?, ?, ?, ?, ?, ?) RETURNING main_id, main_handle, photo_url, medium`,
       [
-        user.twitter_id,
-        user.twitter_handle,
+        user.main_id,
+        user.main_handle,
+        user.medium,
         user.photo_url,
         user.oauth_access_token,
         user.oauth_access_token_iv,
@@ -165,22 +168,22 @@ export default {
       `UPDATE
       users
       SET
-      twitter_handle = ?,
+      main_handle = ?,
       photo_url = ?,
       oauth_access_token = ?,
       oauth_access_token_iv = ?,
       oauth_secret_token = ?,
       oauth_secret_token_iv = ?
       WHERE
-      users.twitter_id = ?`,
+      users.main_id = ?`,
       [
-        user.twitter_handle,
+        user.main_handle,
         user.photo_url,
         user.oauth_access_token,
         user.oauth_access_token_iv,
         user.oauth_secret_token,
         user.oauth_secret_token_iv,
-        user.twitter_id,
+        user.main_id,
       ]
     );
   },
@@ -195,7 +198,7 @@ export default {
       oauth_secret_token = ?,
       oauth_secret_token_iv = ?
   WHERE
-      users.twitter_id = ?`,
+      users.main_id = ?`,
       ["", "", "", "", twitterID]
     );
   },
@@ -207,7 +210,7 @@ export default {
     protocol: String
   ) => {
     return await query(
-      "INSERT INTO tweets (twitter_id, tweet_id, arweave_tx_id, protocol_name) VALUES (?, ?, ?, ?)",
+      "INSERT INTO tweets (main_id, tweet_id, arweave_tx_id, protocol_name) VALUES (?, ?, ?, ?)",
       [twitterID, tweetID, arweave_tx_id, protocol]
     );
   },

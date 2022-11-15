@@ -173,7 +173,7 @@ export default function start() {
             console.debug("uploaded to twitter", message);
             console.debug("saving message");
             await db.saveTweetInfo(
-              sub.twitter_id,
+              sub.main_id,
               twitterRes.id_str,
               txID,
               sub.protocol_name

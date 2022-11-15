@@ -113,8 +113,9 @@ app.post(
 
       if (dbUser.length === 0) {
         let res = await db.createNewUser({
-          twitter_id: twitterUserData.id_str,
-          twitter_handle: twitterUserData.screen_name,
+          main_id: twitterUserData.id_str,
+          main_handle: twitterUserData.screen_name,
+          medium: "twitter",
           photo_url: twitterUserData.profile_image_url_https,
           oauth_access_token: encAccessToken.content,
           oauth_access_token_iv: encAccessToken.iv,
@@ -136,10 +137,10 @@ app.post(
       res.cookie(
         USER_COOKIE,
         {
-          twitter_id: user.twitter_id,
-          twitter_handle: user.twitter_handle,
+          main_id: user.main_id,
+          main_handle: user.main_handle,
           photo_url: user.photo_url,
-          logged_in_method: "twitter",
+          medium: user.medium,
         } as UserCookie,
         {
           maxAge: 8 * 60 * 60 * 1000, // 8 hours
@@ -150,8 +151,8 @@ app.post(
         }
       );
       res.status(200).json({
-        twitter_id: user.twitter_id,
-        twitter_handle: user.twitter_handle,
+        main_id: user.main_id,
+        main_handle: user.main_handle,
         photo_url: user.photo_url,
         expiry: Date.now() + 8 * 60 * 60 * 1000,
       });
@@ -167,7 +168,7 @@ app.get("/twitter/users/me", async (req, res) => {
   try {
     const userCookie = getCookie(req, USER_COOKIE);
 
-    let userInfo = await db.fetchUserInfoByTwitterID(userCookie.twitter_id);
+    let userInfo = await db.fetchUserInfoByTwitterID(userCookie.main_id);
     if (userInfo.length === 0) {
       res.status(500).json({ error: "internal error" });
       return;
@@ -175,8 +176,8 @@ app.get("/twitter/users/me", async (req, res) => {
 
     let user = userInfo[0];
     res.status(200).json({
-      twitter_id: user.twitter_id,
-      twitter_handle: user.twitter_handle,
+      main_id: user.main_id,
+      main_handle: user.main_handle,
       is_subscribed: user.is_subscribed,
       photo_url: user.photo_url,
     });
@@ -192,7 +193,7 @@ app.post("/twitter/subscribe", async (req, res) => {
     const user = getCookie(req, USER_COOKIE);
 
     // first check if we are already subscribed
-    let sub = await db.subscription(user.twitter_id, data.address, PROTOCOL);
+    let sub = await db.subscription(user.main_id, data.address, PROTOCOL);
     if (sub.length > 0) {
       res
         .status(200)
@@ -203,7 +204,7 @@ app.post("/twitter/subscribe", async (req, res) => {
     const blockHeight = (await arweave.blocks.getCurrent()).height;
 
     await db.subscribe(
-      user.twitter_id,
+      user.main_id,
       data.address,
       PROTOCOL,
       blockHeight.toString()
@@ -224,14 +225,14 @@ app.post("/twitter/unsubscribe", async (req, res) => {
 
     let data = req.body;
 
-    let sub = await db.subscription(user.twitter_id, data.address, PROTOCOL);
+    let sub = await db.subscription(user.main_id, data.address, PROTOCOL);
 
     if (sub.length === 0) {
       res.status(400).json({ error: "sub not found" });
       return;
     }
 
-    await db.unsubscribe(user.twitter_id, data.address, PROTOCOL);
+    await db.unsubscribe(user.main_id, data.address, PROTOCOL);
 
     res.json({ subscribed: false, address: data.address, protocol: PROTOCOL });
     return;
@@ -245,7 +246,7 @@ app.get("/subscriptions", async (req, res) => {
   try {
     const user = getCookie(req, USER_COOKIE);
 
-    let result = await db.subscriptionsByUserID(user.twitter_id);
+    let result = await db.subscriptionsByUserID(user.main_id);
 
     res.status(200).send({ subscriptions: result as Subscription[] });
     return;
@@ -259,7 +260,7 @@ app.post("/twitter/exit", async (req, res) => {
   try {
     const user = getCookie(req, USER_COOKIE);
 
-    await db.removeTwitterAccess(user.twitter_id);
+    await db.removeTwitterAccess(user.main_id);
 
     res.json({ success: true });
   } catch (error) {
