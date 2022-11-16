@@ -39,7 +39,8 @@ app.set("trust proxy", 1); // trust first proxy
 sess.cookie.secure = true; // serve secure cookies
 // }
 var corsOptions = {
-  origin: "https://localhost:5173",
+  origin: process.env.CORS || "https://localhost:5173",
+  // origin: ["https://localhost:5173", "https://ar-notify.vercel.app"],
   optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
   credentials: true,
 };
