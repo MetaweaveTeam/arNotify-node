@@ -131,6 +131,19 @@ export default {
     );
   },
 
+  unsubscribeToAll: async (twitterID: String): Promise<Boolean> => {
+    return await query(
+      `UPDATE
+      subscriptions s
+  SET
+      is_active = 0
+  WHERE
+      s.main_id = ? 
+      `,
+      [twitterID]
+    );
+  },
+
   getTweet: async (txID: String) => {
     return await query("SELECT * FROM tweets where tweets.arweave_tx_id=?", [
       txID,

@@ -260,7 +260,31 @@ app.post("/twitter/exit", async (req, res) => {
   try {
     const user = getCookie(req, USER_COOKIE);
 
+    await db.unsubscribeToAll(user.main_id);
     await db.removeTwitterAccess(user.main_id);
+
+    res.cookie(
+      OAUTH_COOKIE,
+      {},
+      {
+        maxAge: -1,
+        secure: true,
+        httpOnly: true,
+        sameSite: "none", // to make it work for now
+        signed: true,
+      }
+    );
+    res.cookie(
+      USER_COOKIE,
+      {},
+      {
+        maxAge: -1,
+        secure: true,
+        httpOnly: true,
+        sameSite: "none", // to make it work for now
+        signed: true,
+      }
+    );
 
     res.json({ success: true });
   } catch (error) {
@@ -271,8 +295,6 @@ app.post("/twitter/exit", async (req, res) => {
 // logout simply logs you out of the app, keeps the twitter connection
 app.post("/logout", async (req, res) => {
   try {
-    const user = getCookie(req, USER_COOKIE);
-
     res.cookie(
       OAUTH_COOKIE,
       {},
