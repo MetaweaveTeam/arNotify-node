@@ -15,3 +15,7 @@ commit.sh
 TODO.md
 
 ngrok
+
+*.crt
+
+*.key

@@ -11,16 +11,11 @@ dotenv.config();
 import cookieParser from "cookie-parser";
 
 const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
-  console.log(err);
+  console.error(err);
   next(err);
 };
 const app = express();
 
-// Please note that secure: true is a recommended option. However,
-// it requires an https-enabled website, i.e., HTTPS is necessary for secure cookies.
-// If secure is set, and you access your site over HTTP, the cookie will not be set.
-//If you have your node.js behind a proxy and are using secure: true, you need to set "trust proxy" in express:
-// app.set('trust proxy', 1)
 let sess = {
   resave: false,
   secret: process.env.SESSION_SECRET,
@@ -34,23 +29,16 @@ let sess = {
   maxAge: 8 * 60 * 60 * 1000, // 8 hours
 };
 
-// if (process.env.MODE === "production") {
 app.set("trust proxy", 1); // trust first proxy
 sess.cookie.secure = true; // serve secure cookies
-// }
+
 var corsOptions = {
-  origin: process.env.CORS || "https://localhost:5173",
-  // origin: ["https://localhost:5173", "https://ar-notify.vercel.app"],
+  origin: process.env.FRONTEND_URL || "https://localhost:5173",
   optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
   credentials: true,
 };
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
-
-// if (process.env.MODE === "production") app.options("arweave.net", cors());
-// else app.options("localhost:*", cors());
-// app.options("*", cors());
-// app.options("http://localhost:5173", cors());
 
 app.use(session(sess as any));
 app.use(cookieParser(process.env.SESSION_SECRET));

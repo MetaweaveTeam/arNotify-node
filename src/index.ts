@@ -4,6 +4,9 @@ import { getCookie } from "./config/http";
 import { TwitterApi } from "twitter-api-v2";
 import { encrypt } from "./crypto";
 import start from "./cron";
+const https = require("https");
+const fs = require("fs");
+
 import {
   APP_KEY,
   APP_SECRET,
@@ -30,6 +33,7 @@ const client = new TwitterApi({
   appKey: APP_KEY,
   appSecret: APP_SECRET,
 });
+
 welcome();
 
 app.get("/", async (req: Request, res: Response) => {
@@ -327,6 +331,12 @@ app.post("/logout", async (req, res) => {
 start();
 
 // we listen to incoming requests
-app.listen(env.PORT, () => {
-  console.log(`⚡️[server]: Listening on http://localhost:${env.PORT}`);
-});
+// app.listen(env.PORT, () => {
+//   console.log(`⚡️[server]: Listening on http://localhost:${env.PORT}`);
+// });
+
+var key = fs.readFileSync("./certs/selfsigned.key");
+var cert = fs.readFileSync("./certs/selfsigned.crt");
+
+console.log(`⚡️[server]: Listening on https://localhost:${env.PORT}`);
+https.createServer({ key, cert }, app).listen(env.PORT);

@@ -44,8 +44,8 @@ export const OAUTH_COOKIE = "oauth_token";
 export const USER_COOKIE = "user_cookie";
 export const PROTOCOL = "argora";
 
-export const APP_KEY = process.env.CONSUMER_KEY || "INVALID";
-export const APP_SECRET = process.env.CONSUMER_SECRET || "INVALID";
+export const APP_KEY = process.env.TWITTER_CONSUMER_KEY || "INVALID";
+export const APP_SECRET = process.env.TWITTER_CONSUMER_SECRET || "INVALID";
 export const CRON_SCHEDULE = process.env.CRON_SCHEDULE || "INVALID";
 export const ENCRYPTION_ALGO = "aes-256-ctr";
 export const ENCRYPTION_SECRET_KEY = process.env.ENCRYPTION_KEY || "INVALID";
