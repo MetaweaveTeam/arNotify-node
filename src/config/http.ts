@@ -7,13 +7,15 @@ import { Request } from "express";
 import { UserCookie } from "../types";
 import session from "express-session";
 import * as dotenv from "dotenv";
-dotenv.config();
 import cookieParser from "cookie-parser";
+
+dotenv.config();
 
 const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   console.error(err);
   next(err);
 };
+
 const app = express();
 
 let sess = {
@@ -23,13 +25,12 @@ let sess = {
   cookie: {
     secure: true,
     httpOnly: true,
-    sameSite: "none", // for now
+    sameSite: "none",
     signed: true,
   },
   maxAge: 8 * 60 * 60 * 1000, // 8 hours
 };
 
-app.set("trust proxy", 1); // trust first proxy
 sess.cookie.secure = true; // serve secure cookies
 
 var corsOptions = {
@@ -37,6 +38,7 @@ var corsOptions = {
   optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
   credentials: true,
 };
+
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
@@ -45,9 +47,10 @@ app.use(cookieParser(process.env.SESSION_SECRET));
 app.use(helmet()); // set security HTTP headers
 app.use(express.json()); // parse json request body
 app.use(express.urlencoded({ extended: true })); // parse urlencoded request body
-app.use(morgan("combined"));
+app.use(morgan("combined")); // HTTP logger (if needed)
 app.use(errorHandler);
 
+// extracts cookie from signedCookies area, throws error if not
 export function getCookie(req: Request, cookieName: String): UserCookie {
   let cookies = req.signedCookies[cookieName as any];
   if (Array.isArray(cookies)) {
@@ -55,7 +58,22 @@ export function getCookie(req: Request, cookieName: String): UserCookie {
   } else if (cookies) {
     return cookies as UserCookie;
   } else {
-    throw new Error("no cookie");
+    throw new UnauthorizedError("credentials invalid or expired");
+  }
+}
+
+export class UnauthorizedError extends Error {
+  statusCode = 403;
+
+  constructor(message: string) {
+    super(message);
+
+    // 👇️ because we are extending a built-in class
+    Object.setPrototypeOf(this, UnauthorizedError.prototype);
+  }
+
+  getErrorMessage() {
+    return "Unauthorized: " + this.message;
   }
 }
 

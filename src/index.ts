@@ -1,6 +1,6 @@
 import { welcome, env, app, db } from "./config";
 import { Request, Response } from "express";
-import { getCookie } from "./config/http";
+import { getCookie, UnauthorizedError } from "./config/http";
 import { TwitterApi } from "twitter-api-v2";
 import { encrypt } from "./crypto";
 import start from "./cron";
@@ -36,10 +36,6 @@ const client = new TwitterApi({
 
 welcome();
 
-app.get("/", async (req: Request, res: Response) => {
-  res.send("");
-});
-
 // OAuth Step 1
 app.post(
   "/twitter/oauth/request_token",
@@ -49,13 +45,13 @@ app.post(
         await client.generateAuthLink(process.env.FRONTEND_URL);
 
       if (oauth_callback_confirmed !== "true") {
-        res.status(500).json({});
+        res.status(500).json({ error: "callback not confirmed" });
       }
 
       req.session.oauth_token_secret = oauth_token_secret;
       req.session.save(function (err: any) {
         if (err) {
-          console.log(err);
+          console.debug(err);
           next(err);
         }
       });
@@ -64,14 +60,14 @@ app.post(
         maxAge: 15 * 60 * 1000, // 15 minutes
         secure: true,
         httpOnly: true,
-        sameSite: "none", // to make it work for now
+        sameSite: "none",
         signed: true,
       });
 
       res.json({ oauth_token, url });
     } catch (e) {
       console.error(e);
-      res.status(500).json({});
+      res.status(500).json({ error: "could not connect with twitter" });
     }
   }
 );
@@ -88,7 +84,7 @@ app.post(
       if (!oauth_token || !oauth_verifier || !oauth_token_secret) {
         return res
           .status(400)
-          .send("You denied the app or your session expired!");
+          .json({ error: "You denied the app or your session expired!" });
       }
       // Obtain the persistent tokens
       // Create a client from temporary tokens
@@ -104,17 +100,17 @@ app.post(
         accessToken,
         accessSecret,
       } = await client.login(oauth_verifier as string);
-      // loggedClient is an authenticated client in behalf of some user
-      // Store accessToken & accessSecret somewhere
 
       let twitterUserData = await loggedClient.currentUser();
 
       let user: User;
 
-      let dbUser = await db.fetchUserInfoByTwitterID(twitterUserData.id_str);
       let encAccessToken = encrypt(accessToken);
       let encTokenSecret = encrypt(accessSecret);
 
+      let dbUser = await db.fetchUserInfoByTwitterID(twitterUserData.id_str);
+
+      // if a brand new user
       if (dbUser.length === 0) {
         let res = await db.createNewUser({
           main_id: twitterUserData.id_str,
@@ -127,7 +123,8 @@ app.post(
           oauth_secret_token_iv: encTokenSecret.iv,
         });
         if (res.length === 0) {
-          res.status(500).json({ error: "something went wrong" });
+          console.debug("could not create user", res);
+          return res.status(500).json({ error: "something went wrong" });
         }
         user = res[0];
       } else {
@@ -150,7 +147,7 @@ app.post(
           maxAge: 8 * 60 * 60 * 1000, // 8 hours
           secure: true,
           httpOnly: true,
-          sameSite: "none", // to make it work for now
+          sameSite: "none",
           signed: true,
         }
       );
@@ -186,8 +183,12 @@ app.get("/twitter/users/me", async (req, res) => {
       photo_url: user.photo_url,
     });
   } catch (error) {
-    console.error(error);
-    res.status(403).json({ message: "Missing, invalid, or expired tokens" });
+    console.debug(error);
+    if (error instanceof UnauthorizedError) {
+      return res.status(403).json({ message: error.getErrorMessage() });
+    } else {
+      return res.status(500).json({ message: "server error" });
+    }
   }
 });
 
@@ -198,6 +199,7 @@ app.post("/twitter/subscribe", async (req, res) => {
 
     // first check if we are already subscribed
     let sub = await db.subscription(user.main_id, data.address, PROTOCOL);
+    // if already subscribed, we send back a 200
     if (sub.length > 0) {
       res
         .status(200)
@@ -214,12 +216,16 @@ app.post("/twitter/subscribe", async (req, res) => {
       blockHeight.toString()
     );
 
-    res
+    return res
       .status(200)
       .json({ subscribed: true, address: data.address, protocol: PROTOCOL });
   } catch (error) {
-    console.error(error);
-    res.status(403).json({ message: "Missing, invalid, or expired tokens" });
+    console.debug(error);
+    if (error instanceof UnauthorizedError) {
+      return res.status(403).json({ message: error.getErrorMessage() });
+    } else {
+      return res.status(500).json({ message: "server error" });
+    }
   }
 });
 
@@ -232,7 +238,7 @@ app.post("/twitter/unsubscribe", async (req, res) => {
     let sub = await db.subscription(user.main_id, data.address, PROTOCOL);
 
     if (sub.length === 0) {
-      res.status(400).json({ error: "sub not found" });
+      res.status(400).json({ error: "subscription not found" });
       return;
     }
 
@@ -241,8 +247,12 @@ app.post("/twitter/unsubscribe", async (req, res) => {
     res.json({ subscribed: false, address: data.address, protocol: PROTOCOL });
     return;
   } catch (error) {
-    console.error(error);
-    res.status(403).json({ message: "Missing, invalid, or expired tokens" });
+    console.debug(error);
+    if (error instanceof UnauthorizedError) {
+      return res.status(403).json({ message: error.getErrorMessage() });
+    } else {
+      return res.status(500).json({ message: "server error" });
+    }
   }
 });
 
@@ -254,12 +264,17 @@ app.get("/subscriptions", async (req, res) => {
 
     res.status(200).send({ subscriptions: result as Subscription[] });
     return;
-  } catch (e) {
-    res.status(404).json({ message: "Problem fetching subscriptions" });
+  } catch (error) {
+    console.debug(error);
+    if (error instanceof UnauthorizedError) {
+      return res.status(403).json({ message: error.getErrorMessage() });
+    } else {
+      return res.status(500).json({ message: "server error" });
+    }
   }
 });
 
-// exit actually removes the twitter connection and logs out the user
+// exit actually removes the twitter connection, its subscriptions and logs out the user
 app.post("/twitter/exit", async (req, res) => {
   try {
     const user = getCookie(req, USER_COOKIE);
@@ -274,7 +289,7 @@ app.post("/twitter/exit", async (req, res) => {
         maxAge: -1,
         secure: true,
         httpOnly: true,
-        sameSite: "none", // to make it work for now
+        sameSite: "none",
         signed: true,
       }
     );
@@ -285,14 +300,19 @@ app.post("/twitter/exit", async (req, res) => {
         maxAge: -1,
         secure: true,
         httpOnly: true,
-        sameSite: "none", // to make it work for now
+        sameSite: "none",
         signed: true,
       }
     );
 
     res.json({ success: true });
   } catch (error) {
-    res.status(403).json({ message: "Missing, invalid, or expired tokens" });
+    console.debug(error);
+    if (error instanceof UnauthorizedError) {
+      return res.status(403).json({ message: error.getErrorMessage() });
+    } else {
+      return res.status(500).json({ message: "server error" });
+    }
   }
 });
 
@@ -306,7 +326,7 @@ app.post("/logout", async (req, res) => {
         maxAge: -1,
         secure: true,
         httpOnly: true,
-        sameSite: "none", // to make it work for now
+        sameSite: "none",
         signed: true,
       }
     );
@@ -317,24 +337,25 @@ app.post("/logout", async (req, res) => {
         maxAge: -1,
         secure: true,
         httpOnly: true,
-        sameSite: "none", // to make it work for now
+        sameSite: "none",
         signed: true,
       }
     );
     res.json({ success: true });
   } catch (error) {
-    res.status(403).json({ message: "Missing, invalid, or expired tokens" });
+    console.debug(error);
+    if (error instanceof UnauthorizedError) {
+      return res.status(403).json({ message: error.getErrorMessage() });
+    } else {
+      return res.status(500).json({ message: "server error" });
+    }
   }
 });
 
 // we start the cron job
 start();
 
-// we listen to incoming requests
-// app.listen(env.PORT, () => {
-//   console.log(`⚡️[server]: Listening on http://localhost:${env.PORT}`);
-// });
-
+// we get our self signed certificates
 var key = fs.readFileSync("./certs/selfsigned.key");
 var cert = fs.readFileSync("./certs/selfsigned.crt");
 

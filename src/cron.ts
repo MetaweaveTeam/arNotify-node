@@ -23,6 +23,7 @@ const arweave = Arweave.init({
   protocol: "https",
 });
 
+// formats a message to a twitter friendly one
 function formatToTwitter(message: String) {
   let splitMsg = message.match(/[\s\S]{1,274}/g) || [];
   let tweets: RegExpMatchArray = [];
@@ -38,6 +39,8 @@ function formatToTwitter(message: String) {
   return tweets;
 }
 
+// posts messages to twitter. As we don't have fragmentation of messages on metaweave
+// we post all the pictures in the first tweet.
 async function postToTwitter(
   message: String,
   pictures: String,
@@ -67,16 +70,13 @@ async function postToTwitter(
         }
       }
 
+      // if we don't know what the filetype is, we continue as twitter won't accept it
       if (fileType === "") {
         console.debug("couldn't figure out filetype, continuing");
         continue;
       }
 
-      // we fetch from arweave
-      let img = await axios.get(arweaveHelper.ARWEAVE_GATEWAY + "/" + picTxID, {
-        responseType: "arraybuffer",
-      });
-
+      // we make sure Twitter accepts the file type, otherwise we continue
       if (
         fileType != EUploadMimeType.Gif &&
         fileType != EUploadMimeType.Jpeg &&
@@ -85,9 +85,14 @@ async function postToTwitter(
         fileType != EUploadMimeType.Srt &&
         fileType != EUploadMimeType.Mp4
       ) {
-        console.debug("invalid file type, continuing");
+        console.debug("invalid file type for twitter, continuing");
         continue;
       }
+
+      // we fetch the file data from arweave
+      let img = await axios.get(arweaveHelper.ARWEAVE_GATEWAY + "/" + picTxID, {
+        responseType: "arraybuffer",
+      });
 
       let mediaId = await client.v1.uploadMedia(img.data, {
         mimeType: fileType,
@@ -95,8 +100,7 @@ async function postToTwitter(
       });
       mediaIDs.push(mediaId);
     } catch (e: any) {
-      // console.debug("could not upload media, error: ", e);
-      console.error("media not uploaded, continuing...");
+      console.debug("could not upload media, error: ", e);
     }
   }
   let formattedText = formatToTwitter(message);
@@ -107,9 +111,11 @@ async function postToTwitter(
   let tweets = [];
 
   for (let [id, txt] of formattedText.entries()) {
+    // first tweet gets the pictures
     if (id === 0) {
       tweets.push({ status: txt, media_ids: mediaIDs });
     } else {
+      // the rest do not
       tweets.push({ status: txt });
     }
   }
@@ -122,7 +128,7 @@ async function postToTwitter(
 export default function start() {
   // Schedule tasks to be run on the server.
   cron.schedule(CRON_SCHEDULE, async function () {
-    console.log("running Argora to Twitter task");
+    console.debug("running Argora to Twitter task");
     // for every subscribed user we
     let subscribers = (await db.fetchAllSubscribedUsers()) as UserSub[];
 
@@ -146,8 +152,10 @@ export default function start() {
               await axios.get(arweaveHelper.ARWEAVE_GATEWAY + "/" + txID)
             ).data;
 
+            // we check if the data is under the key .data or ."_data"
             let data = newRes.data ? newRes.data : newRes["_data"];
 
+            // no  empty messages
             let message = data.text;
             if (message === undefined) {
               continue;
