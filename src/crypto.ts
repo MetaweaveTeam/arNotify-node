@@ -6,12 +6,14 @@ dotenv.config();
 export function encrypt(text: string) {
   const iv = crypto.randomBytes(16);
 
-  const cipher = crypto.createCipheriv(
-    ENCRYPTION_ALGO,
-    ENCRYPTION_SECRET_KEY,
-    iv,
-    {}
-  );
+  // ensure the encryption key is the right length
+  let key = crypto
+    .createHash("sha256")
+    .update(String(ENCRYPTION_SECRET_KEY))
+    .digest("base64")
+    .substring(0, 32);
+
+  const cipher = crypto.createCipheriv(ENCRYPTION_ALGO, key, iv, {});
 
   const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
 

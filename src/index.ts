@@ -45,7 +45,7 @@ app.post(
         await client.generateAuthLink(process.env.FRONTEND_URL);
 
       if (oauth_callback_confirmed !== "true") {
-        res.status(500).json({ error: "callback not confirmed" });
+        return res.status(500).json({ error: "callback not confirmed" });
       }
 
       req.session.oauth_token_secret = oauth_token_secret;
