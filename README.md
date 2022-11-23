@@ -35,3 +35,5 @@ Note that we are using HTTPS for both the frontend and the backend (this is requ
 To setup a self signed certificate, run go into the `certs` directory and run `./create_certs.sh`. You can simply press enter until the certs are created.
 
 From root, you can run `npm start` and the server should be running.
+
+If running a frontend app, or making a request to the backend from a browser during development, make sure to visit the URL of the server (https://localhost:3000). You will be shown an error message saying the certificate is not trusted. Click "Proceed Anyway" and this will let your browser know you trust your own self signed certificate and thus will allow you to make requests to the backend.
