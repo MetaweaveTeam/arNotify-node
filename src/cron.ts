@@ -198,12 +198,11 @@ export default function start() {
                 "Something went wrong with the twitter API:",
                 data.errors[0].message
               );
-            } else {
-              console.log("Error:", data.errors);
+              continue;
             }
-          } else {
-            console.log("Error:", data.errors);
           }
+
+          console.log("Error:", data.errors);
         } else {
           console.error(error);
         }
