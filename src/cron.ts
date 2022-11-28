@@ -189,8 +189,24 @@ export default function start() {
             console.debug("message saved");
           }
         }
-      } catch (e) {
-        console.error(e);
+      } catch (error: any) {
+        if ("response" === error.type) {
+          const data = error.data || error.response.data;
+          if (data.errors) {
+            if (data.errors[0].message) {
+              console.log(
+                "Something went wrong with the twitter API:",
+                data.errors[0].message
+              );
+            } else {
+              console.log("Error:", data.errors);
+            }
+          } else {
+            console.log("Error:", data.errors);
+          }
+        } else {
+          console.error(error);
+        }
       }
     }
   });
