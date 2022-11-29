@@ -24,9 +24,15 @@ export function encrypt(text: string) {
 }
 
 export function decrypt(content: String, iv: String) {
+  let key = crypto
+    .createHash("sha256")
+    .update(String(ENCRYPTION_SECRET_KEY))
+    .digest("base64")
+    .substring(0, 32);
+
   const decipher = crypto.createDecipheriv(
     ENCRYPTION_ALGO,
-    ENCRYPTION_SECRET_KEY,
+    key,
     Buffer.from(iv, "hex")
   );
 
