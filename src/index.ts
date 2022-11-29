@@ -1,7 +1,7 @@
 import { welcome, env, app, db } from "./config";
 import { Request, Response } from "express";
-import { getCookie, UnauthorizedError } from "./config/http";
-import { TwitterApi } from "twitter-api-v2";
+import { getCookie } from "./config/http";
+import { TwitterApi, UserV1 } from "twitter-api-v2";
 import { encrypt } from "./crypto";
 import start from "./cron";
 const https = require("https");
@@ -18,6 +18,13 @@ import {
   USER_COOKIE,
 } from "./types";
 import Arweave from "arweave";
+import { client } from "./config/twitter";
+import {
+  DBError,
+  handleAPIError,
+  TwitterError,
+  NotFoundError,
+} from "./config/error";
 
 const arweave = Arweave.init({
   host: "arweave.net",
@@ -28,11 +35,6 @@ const arweave = Arweave.init({
 interface RequestWithSession extends Request {
   session: any;
 }
-
-const client = new TwitterApi({
-  appKey: APP_KEY,
-  appSecret: APP_SECRET,
-});
 
 welcome();
 
@@ -45,7 +47,10 @@ app.post(
         await client.generateAuthLink(process.env.FRONTEND_URL);
 
       if (oauth_callback_confirmed !== "true") {
-        return res.status(500).json({ error: "callback not confirmed" });
+        throw new TwitterError(
+          "error with the twitter api",
+          "oauth_callback_confirmed was not confirmed"
+        );
       }
 
       req.session.oauth_token_secret = oauth_token_secret;
@@ -66,8 +71,7 @@ app.post(
 
       res.json({ oauth_token, url });
     } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "could not connect with twitter" });
+      return handleAPIError(e, res);
     }
   }
 );
@@ -82,9 +86,9 @@ app.post(
       // Get the saved oauth_token_secret from session
       const { oauth_token_secret } = req.session;
       if (!oauth_token || !oauth_verifier || !oauth_token_secret) {
-        return res
-          .status(400)
-          .json({ error: "You denied the app or your session expired!" });
+        return res.status(400).json({
+          error: "you denied the app or your session expired, please try again",
+        });
       }
       // Obtain the persistent tokens
       // Create a client from temporary tokens
@@ -100,15 +104,24 @@ app.post(
         accessToken,
         accessSecret,
       } = await client.login(oauth_verifier as string);
-
-      let twitterUserData = await loggedClient.currentUser();
+      let twitterUserData: UserV1;
+      try {
+        twitterUserData = await loggedClient.currentUser();
+      } catch (e) {
+        throw new TwitterError("internal error", e);
+      }
 
       let user: User;
 
       let encAccessToken = encrypt(accessToken);
       let encTokenSecret = encrypt(accessSecret);
 
-      let dbUser = await db.fetchUserInfoByTwitterID(twitterUserData.id_str);
+      let dbUser: any;
+      try {
+        dbUser = await db.fetchUserInfoByTwitterID(twitterUserData.id_str);
+      } catch (e) {
+        throw new DBError("internal error", e);
+      }
 
       // if a brand new user
       if (dbUser.length === 0) {
@@ -123,8 +136,10 @@ app.post(
           oauth_secret_token_iv: encTokenSecret.iv,
         });
         if (res.length === 0) {
-          console.debug("could not create user", res);
-          return res.status(500).json({ error: "something went wrong" });
+          throw new DBError(
+            "internal error",
+            "[db]: could not create user " + res
+          );
         }
         user = res[0];
       } else {
@@ -133,7 +148,14 @@ app.post(
         user.oauth_access_token_iv = encAccessToken.iv;
         user.oauth_secret_token = encTokenSecret.content;
         user.oauth_secret_token_iv = encTokenSecret.iv;
-        await db.updateUserInfo(user);
+        try {
+          await db.updateUserInfo(user);
+        } catch (e) {
+          throw new DBError(
+            "internal error",
+            "[db]: could not update user" + e
+          );
+        }
       }
       res.cookie(
         USER_COOKIE,
@@ -158,8 +180,7 @@ app.post(
         expiry: Date.now() + 8 * 60 * 60 * 1000,
       });
     } catch (e: any) {
-      console.error(e);
-      res.status(403).send("Invalid verifier or access tokens!");
+      return handleAPIError(e, res);
     }
   }
 );
@@ -171,8 +192,7 @@ app.get("/twitter/users/me", async (req, res) => {
 
     let userInfo = await db.fetchUserInfoByTwitterID(userCookie.main_id);
     if (userInfo.length === 0) {
-      res.status(500).json({ error: "internal error" });
-      return;
+      throw new NotFoundError("user_by_twitter_id", "internal error");
     }
 
     let user = userInfo[0];
@@ -182,13 +202,8 @@ app.get("/twitter/users/me", async (req, res) => {
       is_subscribed: user.is_subscribed,
       photo_url: user.photo_url,
     });
-  } catch (error) {
-    console.debug(error);
-    if (error instanceof UnauthorizedError) {
-      return res.status(403).json({ message: error.getErrorMessage() });
-    } else {
-      return res.status(500).json({ message: "server error" });
-    }
+  } catch (e) {
+    return handleAPIError(e, res);
   }
 });
 
@@ -219,13 +234,8 @@ app.post("/twitter/subscribe", async (req, res) => {
     return res
       .status(200)
       .json({ subscribed: true, address: data.address, protocol: PROTOCOL });
-  } catch (error) {
-    console.debug(error);
-    if (error instanceof UnauthorizedError) {
-      return res.status(403).json({ message: error.getErrorMessage() });
-    } else {
-      return res.status(500).json({ message: "server error" });
-    }
+  } catch (e) {
+    return handleAPIError(e, res);
   }
 });
 
@@ -238,21 +248,15 @@ app.post("/twitter/unsubscribe", async (req, res) => {
     let sub = await db.subscription(user.main_id, data.address, PROTOCOL);
 
     if (sub.length === 0) {
-      res.status(400).json({ error: "subscription not found" });
-      return;
+      throw new NotFoundError("subscription", "subscription not found");
     }
 
     await db.unsubscribe(user.main_id, data.address, PROTOCOL);
 
     res.json({ subscribed: false, address: data.address, protocol: PROTOCOL });
     return;
-  } catch (error) {
-    console.debug(error);
-    if (error instanceof UnauthorizedError) {
-      return res.status(403).json({ message: error.getErrorMessage() });
-    } else {
-      return res.status(500).json({ message: "server error" });
-    }
+  } catch (e) {
+    return handleAPIError(e, res);
   }
 });
 
@@ -264,13 +268,8 @@ app.get("/subscriptions", async (req, res) => {
 
     res.status(200).send({ subscriptions: result as Subscription[] });
     return;
-  } catch (error) {
-    console.debug(error);
-    if (error instanceof UnauthorizedError) {
-      return res.status(403).json({ message: error.getErrorMessage() });
-    } else {
-      return res.status(500).json({ message: "server error" });
-    }
+  } catch (e) {
+    return handleAPIError(e, res);
   }
 });
 
@@ -306,13 +305,8 @@ app.post("/twitter/exit", async (req, res) => {
     );
 
     res.json({ success: true });
-  } catch (error) {
-    console.debug(error);
-    if (error instanceof UnauthorizedError) {
-      return res.status(403).json({ message: error.getErrorMessage() });
-    } else {
-      return res.status(500).json({ message: "server error" });
-    }
+  } catch (e) {
+    return handleAPIError(e, res);
   }
 });
 
@@ -342,13 +336,8 @@ app.post("/logout", async (req, res) => {
       }
     );
     res.json({ success: true });
-  } catch (error) {
-    console.debug(error);
-    if (error instanceof UnauthorizedError) {
-      return res.status(403).json({ message: error.getErrorMessage() });
-    } else {
-      return res.status(500).json({ message: "server error" });
-    }
+  } catch (e) {
+    return handleAPIError(e, res);
   }
 });
 

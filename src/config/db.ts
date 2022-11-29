@@ -16,7 +16,15 @@ async function ensure_connected() {
   let conn;
   try {
     conn = await pool.getConnection();
-    await conn.query("SELECT 1 as val");
+    let res = (await conn.query("SELECT * from protocols")).filter(
+      (elem: any) => elem.protocol_name === "argora"
+    );
+
+    if (res.length === 0) {
+      throw new Error(
+        "[mariadb]: error, could not fetch protocols table, ensure your DB is properly migrated"
+      );
+    }
     console.log(
       `⚡️[mariadb]: connected as id ${conn.threadId} at ${env.DB_HOST}:${env.DB_PORT}`
     );

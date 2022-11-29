@@ -8,6 +8,7 @@ import { UserCookie } from "../types";
 import session from "express-session";
 import * as dotenv from "dotenv";
 import cookieParser from "cookie-parser";
+import { UnauthorizedError } from "./error";
 
 dotenv.config();
 
@@ -59,21 +60,6 @@ export function getCookie(req: Request, cookieName: String): UserCookie {
     return cookies as UserCookie;
   } else {
     throw new UnauthorizedError("credentials invalid or expired");
-  }
-}
-
-export class UnauthorizedError extends Error {
-  statusCode = 403;
-
-  constructor(message: string) {
-    super(message);
-
-    // 👇️ because we are extending a built-in class
-    Object.setPrototypeOf(this, UnauthorizedError.prototype);
-  }
-
-  getErrorMessage() {
-    return "Unauthorized: " + this.message;
   }
 }
 

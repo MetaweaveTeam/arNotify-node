@@ -1,8 +1,8 @@
 import arweaveHelper from "./arweave_helper";
-import axios from "axios";
+import axios, { AxiosResponse } from "axios";
 import { request } from "graphql-request";
 import { decrypt } from "./crypto";
-import { EUploadMimeType, TwitterApi } from "twitter-api-v2";
+import { EUploadMimeType, TweetV1, TwitterApi } from "twitter-api-v2";
 import { db } from "./config";
 import {
   APP_KEY,
@@ -14,6 +14,13 @@ import {
 import cron from "node-cron";
 import Arweave from "arweave";
 import { TwitterApiRateLimitPlugin } from "@twitter-api-v2/plugin-rate-limit";
+import Transaction from "arweave/node/lib/transaction";
+import {
+  ArweaveError,
+  DBError,
+  handleCronError,
+  TwitterCronError,
+} from "./config/error";
 
 const rateLimitPlugin = new TwitterApiRateLimitPlugin();
 
@@ -61,7 +68,15 @@ async function postToTwitter(
   let mediaIDs: string[] = [];
   for (let picTxID of pictures) {
     try {
-      let picTx = await arweave.transactions.get(picTxID);
+      let picTx: Transaction;
+      try {
+        picTx = await arweave.transactions.get(picTxID);
+      } catch (e) {
+        throw new ArweaveError(
+          "[cron]: could not get picture tx info from arweave " + picTxID,
+          e
+        );
+      }
 
       let fileType = "";
       for (let tag of picTx.tags) {
@@ -72,7 +87,9 @@ async function postToTwitter(
 
       // if we don't know what the filetype is, we continue as twitter won't accept it
       if (fileType === "") {
-        console.debug("couldn't figure out filetype, continuing");
+        console.debug(
+          "[cron]: couldn't figure out filetype for media upload, continuing"
+        );
         continue;
       }
 
@@ -85,22 +102,38 @@ async function postToTwitter(
         fileType != EUploadMimeType.Srt &&
         fileType != EUploadMimeType.Mp4
       ) {
-        console.debug("invalid file type for twitter, continuing");
+        console.debug("[cron]: invalid file type for twitter API, continuing");
         continue;
       }
 
       // we fetch the file data from arweave
-      let img = await axios.get(arweaveHelper.ARWEAVE_GATEWAY + "/" + picTxID, {
-        responseType: "arraybuffer",
-      });
+      let img: AxiosResponse<any, any>;
+      try {
+        img = await axios.get(arweaveHelper.ARWEAVE_GATEWAY + "/" + picTxID, {
+          responseType: "arraybuffer",
+        });
+      } catch (e) {
+        throw new ArweaveError(
+          "[cron]: could not get picture data from arweave " + picTxID,
+          e
+        );
+      }
+      let mediaId: string;
+      try {
+        mediaId = await client.v1.uploadMedia(img.data, {
+          mimeType: fileType,
+          type: fileType,
+        });
+      } catch (e) {
+        throw new TwitterCronError(
+          "[cron]: could not upload media to twitter ",
+          e
+        );
+      }
 
-      let mediaId = await client.v1.uploadMedia(img.data, {
-        mimeType: fileType,
-        type: fileType,
-      });
       mediaIDs.push(mediaId);
     } catch (e: any) {
-      console.debug("could not upload media, error: ", e);
+      console.debug("[cron]: could not upload media, error: ", e);
     }
   }
   let formattedText = formatToTwitter(message);
@@ -119,8 +152,12 @@ async function postToTwitter(
       tweets.push({ status: txt });
     }
   }
-
-  let res = await client.v1.tweetThread(tweets);
+  let res: TweetV1[];
+  try {
+    res = await client.v1.tweetThread(tweets);
+  } catch (e) {
+    throw new TwitterCronError("[cron]: could not tweet thread to twitter ", e);
+  }
 
   return { id_str: res[0].id_str };
 }
@@ -128,29 +165,43 @@ async function postToTwitter(
 export default function start() {
   // Schedule tasks to be run on the server.
   cron.schedule(CRON_SCHEDULE, async function () {
-    console.debug("running Argora to Twitter task");
+    console.debug("[cron]: running Argora to Twitter task");
     // for every subscribed user we
     let subscribers = (await db.fetchAllSubscribedUsers()) as UserSub[];
 
     for (let sub of subscribers) {
       try {
         // fetch the latest argora messages
-        let res = await request(
-          arweaveHelper.ARWEAVE_GQL_ENDPOINT,
-          arweaveHelper.argoraQuery(
-            [sub.arweave_address],
-            +sub.from_block_height
-          )
-        );
+        let res: any;
+
+        try {
+          res = await request(
+            arweaveHelper.ARWEAVE_GQL_ENDPOINT,
+            arweaveHelper.argoraQuery(
+              [sub.arweave_address],
+              +sub.from_block_height
+            )
+          );
+        } catch (e) {
+          throw new ArweaveError("could not make graphql query", e);
+        }
 
         // we reverse the array to start with the older message first
         let txs = res.transactions.edges.reverse();
         for (let tx of txs) {
           let txID = tx.node.id;
           if ((await db.getTweet(txID)).length === 0) {
-            let newRes = (
-              await axios.get(arweaveHelper.ARWEAVE_GATEWAY + "/" + txID)
-            ).data;
+            let newRes: any;
+            try {
+              newRes = (
+                await axios.get(arweaveHelper.ARWEAVE_GATEWAY + "/" + txID)
+              ).data;
+            } catch (e) {
+              throw new ArweaveError(
+                "could not get txID " + txID + " from arweave ",
+                e
+              );
+            }
 
             // we check if the data is under the key .data or ."_data"
             let data = newRes.data ? newRes.data : newRes["_data"];
@@ -162,7 +213,7 @@ export default function start() {
             }
             let pics = data.pictures;
             let pictures = pics === undefined ? [] : pics;
-            console.debug("uploading message", message);
+            console.debug("[cron]: uploading message", message);
             let oauthAccessToken = decrypt(
               sub.oauth_access_token,
               sub.oauth_access_token_iv
@@ -178,34 +229,23 @@ export default function start() {
               oauthAccessToken,
               oauthSecretToken
             );
-            console.debug("uploaded to twitter", message);
-            console.debug("saving message");
-            await db.saveTweetInfo(
-              sub.main_id,
-              twitterRes.id_str,
-              txID,
-              sub.protocol_name
-            );
-            console.debug("message saved");
-          }
-        }
-      } catch (error: any) {
-        if ("response" === error.type) {
-          const data = error.data || error.response.data;
-          if (data.errors) {
-            if (data.errors[0].message) {
-              console.log(
-                "Something went wrong with the twitter API:",
-                data.errors[0].message
+            console.debug("[cron]: uploaded to twitter", message);
+            console.debug("[cron]: saving message");
+            try {
+              await db.saveTweetInfo(
+                sub.main_id,
+                twitterRes.id_str,
+                txID,
+                sub.protocol_name
               );
-              continue;
+              console.debug("[cron]: message saved");
+            } catch (e) {
+              throw new DBError("[cron]: could not save message in db", e);
             }
           }
-
-          console.log("Error:", data.errors);
-        } else {
-          console.error(error);
         }
+      } catch (e) {
+        handleCronError(e);
       }
     }
   });
