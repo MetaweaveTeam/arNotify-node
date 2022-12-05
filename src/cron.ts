@@ -2,7 +2,12 @@ import arweaveHelper from "./arweave_helper";
 import axios, { AxiosResponse } from "axios";
 import { request } from "graphql-request";
 import { decrypt } from "./crypto";
-import { EUploadMimeType, TweetV1, TwitterApi } from "twitter-api-v2";
+import {
+  EApiV1ErrorCode,
+  EUploadMimeType,
+  TweetV1,
+  TwitterApi,
+} from "twitter-api-v2";
 import { db } from "./config";
 import {
   APP_KEY,
@@ -23,7 +28,7 @@ import {
 } from "./config/error";
 
 const rateLimitPlugin = new TwitterApiRateLimitPlugin();
-
+const TwitterDuplicateHTTPCode = 403;
 const arweave = Arweave.init({
   host: "arweave.net",
   port: 443,
@@ -31,15 +36,39 @@ const arweave = Arweave.init({
 });
 
 // formats a message to a twitter friendly one
-function formatToTwitter(message: String) {
-  let splitMsg = message.match(/[\s\S]{1,274}/g) || [];
-  let tweets: RegExpMatchArray = [];
+function formatToTwitter(
+  message: string,
+  arweaveTxID: string,
+  mediaIDs: string[],
+  index: number
+) {
+  let msg = message;
+  if (index > 0) {
+    msg = `(${index}) ` + message;
+  }
+  let splitMsg = msg.match(/[\s\S]{1,274}/g) || [];
+  let tweetsMsgs: RegExpMatchArray = [];
 
   if (splitMsg.length === 1) {
-    tweets = splitMsg;
+    tweetsMsgs = splitMsg;
   } else {
     for (var i = 0; i < splitMsg.length; i++) {
-      tweets.push(i + 1 + "/" + splitMsg.length + " " + splitMsg[i]);
+      tweetsMsgs.push(i + 1 + "/" + splitMsg.length + " " + splitMsg[i]);
+    }
+  }
+  tweetsMsgs.push(
+    `Tweet originally published at ${METAWEAVE_URL}${arweaveTxID} @MetaweaveTeam`
+  );
+
+  let tweets = [];
+
+  for (let [id, txt] of tweetsMsgs.entries()) {
+    // first tweet gets the pictures
+    if (id === 0) {
+      tweets.push({ status: txt, media_ids: mediaIDs });
+    } else {
+      // the rest do not
+      tweets.push({ status: txt });
     }
   }
 
@@ -49,11 +78,11 @@ function formatToTwitter(message: String) {
 // posts messages to twitter. As we don't have fragmentation of messages on metaweave
 // we post all the pictures in the first tweet.
 async function postToTwitter(
-  message: String,
-  pictures: String,
-  arweaveTxID: String,
-  oauth_access_token: String,
-  oauth_access_token_secret: String
+  message: string,
+  pictures: string,
+  arweaveTxID: string,
+  oauth_access_token: string,
+  oauth_access_token_secret: string
 ) {
   const client = new TwitterApi(
     {
@@ -124,7 +153,7 @@ async function postToTwitter(
           mimeType: fileType,
           type: fileType,
         });
-      } catch (e) {
+      } catch (e: any) {
         throw new TwitterCronError(
           "[cron]: could not upload media to twitter ",
           e
@@ -136,29 +165,39 @@ async function postToTwitter(
       console.debug("[cron]: could not upload media, error: ", e);
     }
   }
-  let formattedText = formatToTwitter(message);
-  formattedText.push(
-    `Tweet originally published at ${METAWEAVE_URL}${arweaveTxID} @MetaweaveTeam`
-  );
+  let tweets = formatToTwitter(message, arweaveTxID, mediaIDs, 0);
 
-  let tweets = [];
-
-  for (let [id, txt] of formattedText.entries()) {
-    // first tweet gets the pictures
-    if (id === 0) {
-      tweets.push({ status: txt, media_ids: mediaIDs });
-    } else {
-      // the rest do not
-      tweets.push({ status: txt });
-    }
-  }
   let res: TweetV1[];
   try {
     res = await client.v1.tweetThread(tweets);
-  } catch (e) {
-    throw new TwitterCronError("[cron]: could not tweet thread to twitter ", e);
+  } catch (e: any) {
+    if (e.code === TwitterDuplicateHTTPCode) {
+      let counter = 1;
+      // to ensure that we deduplicate the tweets, we keep trying with a counter added to the message
+      while (true) {
+        try {
+          let tweets = formatToTwitter(message, arweaveTxID, mediaIDs, counter);
+          res = await client.v1.tweetThread(tweets);
+          return { id_str: res[0].id_str };
+        } catch (e: any) {
+          if (e.code === TwitterDuplicateHTTPCode) {
+            counter++;
+            continue;
+          } else {
+            throw new TwitterCronError(
+              "[cron]: could not tweet thread to twitter ",
+              e
+            );
+          }
+        }
+      }
+    } else {
+      throw new TwitterCronError(
+        "[cron]: could not tweet thread to twitter ",
+        e
+      );
+    }
   }
-
   return { id_str: res[0].id_str };
 }
 
