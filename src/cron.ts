@@ -46,8 +46,8 @@ function formatToTwitter(
   if (index > 0) {
     msg = `(${index}) ` + message;
   }
-  let splitMsg = msg.match(/[\s\S]{1,274}/g) || [];
-  let tweetsMsgs: RegExpMatchArray = [];
+  let splitMsg: string[] = msg.match(/[\s\S]{1,274}/g) || [];
+  let tweetsMsgs: string[] = [];
 
   if (splitMsg.length === 1) {
     tweetsMsgs = splitMsg;
