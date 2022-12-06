@@ -6,6 +6,18 @@ dist
 
 # env
 .env
+.env.dev
+.env.stage
 
 # misc
 .DS_Store
+
+commit.sh
+
+TODO.md
+
+ngrok
+
+*.crt
+
+*.key
