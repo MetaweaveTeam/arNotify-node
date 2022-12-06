@@ -345,8 +345,8 @@ app.post("/logout", async (req, res) => {
 start();
 
 // we get our self signed certificates
-var key = fs.readFileSync("./certs/selfsigned.key");
-var cert = fs.readFileSync("./certs/selfsigned.crt");
+var key = fs.readFileSync("./certs/privkey.pem");
+var cert = fs.readFileSync("./certs/cert.pem");
 
 console.log(`⚡️[server]: Listening on https://localhost:${env.PORT}`);
 https.createServer({ key, cert }, app).listen(env.PORT);

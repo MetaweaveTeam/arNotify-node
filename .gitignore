@@ -18,6 +18,4 @@ TODO.md
 
 ngrok
 
-*.crt
-
-*.key
+*.pem

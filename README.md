@@ -2,13 +2,26 @@
 
 Node server for [arNotify](https://github.com/MetaweaveTeam/arNotify)
 
-**Development environment:** You'll need docker and docker-compose installed on your system.
+**Development environment requirements:** You'll need docker and docker-compose installed on your system.
+As well you will need to provide a key/certificate for the https server to work:
 
-## Getting started
 
-1. `$ git clone git@github.com:MetaweaveTeam/arNotify-node.git && cd arNotify-node`
-2. `$ npm install`
-3. `$ npm start`
+## Development
+
+### Requirements
+
+You'll need docker and docker-compose installed on your system.
+
+### Getting started
+
+1. `$ git clone git@github.com:MetaweaveTeam/arNotify-node.git`
+2. `$ cd arNotify-node`
+3. you'll need to generate a key/certificate for the https server:
+```sh
+$ sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout certs/privkey.pem -out certs/cert.pem
+```
+4. `$ npm install`
+5. `$ npm start`
 
 You'll have the following services running:
 

@@ -35,7 +35,8 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - ./certs:/home/node/app/certs
+      - ./certs/privkey.pem:/home/node/app/certs/privkey.pem
+      - ./certs/cert.pem:/home/node/app/certs/cert.pem
     ports:
       - 3120:3000
     depends_on: 
