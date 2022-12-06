@@ -14,7 +14,7 @@ services:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
   
   phpmyadmin:
-    container_name: node.arnotify.xyz-phpmyadmin
+    container_name: dbadmin.arnotify.xyz
     image: phpmyadmin/phpmyadmin:5
     restart: always
     environment:
