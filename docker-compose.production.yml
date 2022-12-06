@@ -1,0 +1,45 @@
+version: '3.7'
+services:
+  db:
+    container_name: node.arnotify.xyz-mariadb
+    image: mariadb:10.9
+    restart: always
+    environment:
+      MARIADB_DATABASE: arnotify
+      MARIADB_USER: arnotify_user
+      MARIADB_PASSWORD: arnotify_password
+      MARIADB_ROOT_PASSWORD: arnotify_root_password
+    volumes:
+      - mariadb:/var/lib/mariadb
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+  
+  phpmyadmin:
+    container_name: node.arnotify.xyz-phpmyadmin
+    image: phpmyadmin/phpmyadmin:5
+    restart: always
+    environment:
+      PMA_PORT: 3306
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: arnotify_root_password
+    ports:
+      - 3121:80
+    depends_on: 
+      - db
+
+  node:
+    container_name: node.arnotify.xyz
+    image: arnotify-node
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./certs:/home/node/app/certs
+    ports:
+      - 3120:3000
+    depends_on: 
+      - db
+
+volumes:
+  mariadb:

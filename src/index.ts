@@ -44,7 +44,7 @@ app.post(
   async (req: RequestWithSession, res: Response, next) => {
     try {
       const { url, oauth_token, oauth_token_secret, oauth_callback_confirmed } =
-        await client.generateAuthLink(process.env.FRONTEND_URL);
+        await client.generateAuthLink(env.FRONTEND_URL);
 
       if (oauth_callback_confirmed !== "true") {
         throw new TwitterError(
