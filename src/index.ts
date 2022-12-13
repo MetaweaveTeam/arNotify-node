@@ -131,6 +131,7 @@ app.post(
           main_handle: twitterUserData.screen_name,
           followers_count: twitterUserData.followers_count,
           earning_rate: earningRate(twitterUserData.followers_count),
+          arweave_address: "",
           medium: "twitter",
           photo_url: twitterUserData.profile_image_url_https,
           oauth_access_token: encAccessToken.content,
@@ -166,6 +167,8 @@ app.post(
           main_id: user.main_id,
           main_handle: user.main_handle,
           followers_count: user.followers_count,
+          earning_rate: user.earning_rate,
+          arweave_address: user.arweave_address,
           photo_url: user.photo_url,
           medium: user.medium,
         } as UserCookie,
@@ -229,7 +232,42 @@ app.get("/twitter/users/me", async (req, res) => {
       is_subscribed: user.is_subscribed,
       photo_url: user.photo_url,
       followers_count: user.followers_count || 0,
+      arweave_address: user.arweave_address || "",
       tweets_count: Number(tweets[0].count) || 0,
+      earning_rate: user.earning_rate || 0,
+    });
+  } catch (e) {
+    return handleAPIError(e, res);
+  }
+});
+
+app.post("/arweave/wallet", async (req, res) => {
+  try {
+    const walletAddress = req.body.address;
+    if (!walletAddress) {
+      throw new NotFoundError("address", "address is required");
+    }
+
+    const userCookie = getCookie(req, USER_COOKIE);
+    let userInfo = await db.fetchUserInfoByTwitterID(userCookie.main_id);
+    if (userInfo.length === 0) {
+      throw new NotFoundError("user_by_twitter_id", "internal error");
+    }
+
+    let user = userInfo[0];
+    user.arweave_address = walletAddress;
+    const userUpdate = await db.updateUserInfo(user);
+    if (userUpdate.length === 0) {
+      throw new DBError("internal error", "[db]: could not update user");
+    }
+
+    res.status(200).json({
+      main_id: user.main_id,
+      main_handle: user.main_handle,
+      is_subscribed: user.is_subscribed,
+      photo_url: user.photo_url,
+      followers_count: user.followers_count || 0,
+      arweave_address: user.arweave_address || "",
       earning_rate: user.earning_rate || 0,
     });
   } catch (e) {

@@ -3,6 +3,7 @@ CREATE TABLE users(
     main_handle TEXT NOT NULL UNIQUE, -- twitter or insta
     followers_count INT NOT NULL,
     earning_rate INT NOT NULL,
+    arweave_address TEXT NOT NULL,
     medium TEXT NOT NULL,
     photo_url TEXT,
     oauth_access_token TEXT,

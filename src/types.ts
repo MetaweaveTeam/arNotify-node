@@ -4,6 +4,7 @@ export type User = {
   medium: String;
   followers_count: Number;
   earning_rate: Number;
+  arweave_address: String;
   photo_url: String;
   oauth_access_token: String;
   oauth_access_token_iv: String;
