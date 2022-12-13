@@ -146,7 +146,7 @@ export default {
   SET
       is_active = 0
   WHERE
-      s.main_id = ? 
+      s.main_id = ?
       `,
       [twitterID]
     );
@@ -164,17 +164,19 @@ export default {
         main_id,
         main_handle,
         medium,
+        followers_count,
         photo_url,
         oauth_access_token,
         oauth_access_token_iv,
         oauth_secret_token,
         oauth_secret_token_iv
     )
-    VALUES(?, ?, ?, ?, ?, ?, ?, ?) RETURNING main_id, main_handle, photo_url, medium`,
+    VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING main_id, main_handle, photo_url, medium`,
       [
         user.main_id,
         user.main_handle,
         user.medium,
+        user.followers_count,
         user.photo_url,
         user.oauth_access_token,
         user.oauth_access_token_iv,
@@ -191,6 +193,7 @@ export default {
       SET
       main_handle = ?,
       photo_url = ?,
+      followers_count = ?,
       oauth_access_token = ?,
       oauth_access_token_iv = ?,
       oauth_secret_token = ?,
@@ -200,6 +203,7 @@ export default {
       [
         user.main_handle,
         user.photo_url,
+        user.followers_count,
         user.oauth_access_token,
         user.oauth_access_token_iv,
         user.oauth_secret_token,

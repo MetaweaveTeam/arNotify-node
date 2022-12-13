@@ -134,6 +134,7 @@ app.post(
           oauth_access_token_iv: encAccessToken.iv,
           oauth_secret_token: encTokenSecret.content,
           oauth_secret_token_iv: encTokenSecret.iv,
+          followers_count: twitterUserData.followers_count,
         });
         if (res.length === 0) {
           throw new DBError(
@@ -162,6 +163,7 @@ app.post(
         {
           main_id: user.main_id,
           main_handle: user.main_handle,
+          followers_count: user.followers_count,
           photo_url: user.photo_url,
           medium: user.medium,
         } as UserCookie,
@@ -196,17 +198,42 @@ app.get("/twitter/users/me", async (req, res) => {
     }
 
     let user = userInfo[0];
+
+    const usersTwitter = await client.v1.users({
+      screen_name: user.main_handle,
+    });
+    const userTwitter = usersTwitter[0];
+
+    if (!userTwitter) {
+      throw new NotFoundError("user_by_twitter_handle", "internal error");
+    }
+
+    user.followers_count = userTwitter.followers_count;
+    const userUpdate = await db.updateUserInfo(user);
+
+    if (userUpdate.length === 0) {
+      throw new DBError("internal error", "[db]: could not update user");
+    }
+
     res.status(200).json({
       main_id: user.main_id,
       main_handle: user.main_handle,
       is_subscribed: user.is_subscribed,
       photo_url: user.photo_url,
+      followers_count: userTwitter.followers_count,
     });
   } catch (e) {
     return handleAPIError(e, res);
   }
 });
 
+app.get("/twitter/followers", async (req, res) => {
+  const userTwitter = await client.v1.users({
+    screen_name: "itsanuness",
+  });
+
+  res.json(userTwitter);
+});
 app.post("/twitter/subscribe", async (req, res) => {
   try {
     let data = req.body;
