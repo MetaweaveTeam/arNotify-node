@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import { getCookie } from "./config/http";
 import { TwitterApi, UserV1 } from "twitter-api-v2";
 import { encrypt } from "./crypto";
+import { earningRate } from "./config/twitter";
 import start from "./cron";
 const https = require("https");
 const fs = require("fs");
@@ -128,13 +129,14 @@ app.post(
         let res = await db.createNewUser({
           main_id: twitterUserData.id_str,
           main_handle: twitterUserData.screen_name,
+          followers_count: twitterUserData.followers_count,
+          earning_rate: earningRate(twitterUserData.followers_count),
           medium: "twitter",
           photo_url: twitterUserData.profile_image_url_https,
           oauth_access_token: encAccessToken.content,
           oauth_access_token_iv: encAccessToken.iv,
           oauth_secret_token: encTokenSecret.content,
           oauth_secret_token_iv: encTokenSecret.iv,
-          followers_count: twitterUserData.followers_count,
         });
         if (res.length === 0) {
           throw new DBError(
@@ -209,8 +211,9 @@ app.get("/twitter/users/me", async (req, res) => {
     }
 
     user.followers_count = userTwitter.followers_count;
-    const userUpdate = await db.updateUserInfo(user);
+    user.earning_rate = earningRate(user.followers_count);
 
+    const userUpdate = await db.updateUserInfo(user);
     if (userUpdate.length === 0) {
       throw new DBError("internal error", "[db]: could not update user");
     }
@@ -221,19 +224,13 @@ app.get("/twitter/users/me", async (req, res) => {
       is_subscribed: user.is_subscribed,
       photo_url: user.photo_url,
       followers_count: userTwitter.followers_count,
+      earning_rate: user.earning_rate,
     });
   } catch (e) {
     return handleAPIError(e, res);
   }
 });
 
-app.get("/twitter/followers", async (req, res) => {
-  const userTwitter = await client.v1.users({
-    screen_name: "itsanuness",
-  });
-
-  res.json(userTwitter);
-});
 app.post("/twitter/subscribe", async (req, res) => {
   try {
     let data = req.body;
