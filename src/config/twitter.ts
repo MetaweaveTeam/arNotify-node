@@ -12,7 +12,7 @@ export function earningRate(followers: number): number {
     rate = followers * 0.001;
   }
 
-  if (10000 <= followers) {
+  if (10000 <= followers && 100000 > followers) {
     rate = 10000 * 0.001 + followers * 0.0001;
   }
 
@@ -20,10 +20,9 @@ export function earningRate(followers: number): number {
     rate = 10000 * 0.001 + 100000 * 0.0001 + followers * 0.00001;
   }
 
-  if (100 >= rate) {
-    rate = 100;
+  if (rate >= 100) {
+    rate = 0;
   }
-
   return rate.toFixed(2) as any;
 }
 

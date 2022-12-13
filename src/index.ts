@@ -218,13 +218,19 @@ app.get("/twitter/users/me", async (req, res) => {
       throw new DBError("internal error", "[db]: could not update user");
     }
 
+    let tweets = await db.countTweetsByTwitterID(user.main_id);
+    if (tweets.length === 0) {
+      throw new DBError("internal error", "[db]: could not count tweets");
+    }
+
     res.status(200).json({
       main_id: user.main_id,
       main_handle: user.main_handle,
       is_subscribed: user.is_subscribed,
       photo_url: user.photo_url,
-      followers_count: userTwitter.followers_count,
-      earning_rate: user.earning_rate,
+      followers_count: user.followers_count || 0,
+      tweets_count: Number(tweets[0].count) || 0,
+      earning_rate: user.earning_rate || 0,
     });
   } catch (e) {
     return handleAPIError(e, res);

@@ -243,4 +243,11 @@ export default {
       [twitterID, tweetID, arweave_tx_id, protocol]
     );
   },
+
+  countTweetsByTwitterID: async (twitterID: String) => {
+    return await query(
+      "SELECT COUNT(*) as count FROM tweets where tweets.main_id=?",
+      [twitterID]
+    );
+  },
 };
