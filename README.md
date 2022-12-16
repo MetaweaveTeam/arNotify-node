@@ -56,6 +56,5 @@ If running a frontend app, or making a request to the backend from a browser dur
 ```SQL
 ALTER TABLE `users`
 ADD followers_count INT NOT NULL,
-ADD earning_rate INT NOT NULL,
 ADD arweave_address TEXT NOT NULL;
 ```

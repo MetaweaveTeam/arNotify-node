@@ -130,7 +130,6 @@ app.post(
           main_id: twitterUserData.id_str,
           main_handle: twitterUserData.screen_name,
           followers_count: twitterUserData.followers_count,
-          earning_rate: earningRate(twitterUserData.followers_count),
           arweave_address: "",
           medium: "twitter",
           photo_url: twitterUserData.profile_image_url_https,
@@ -167,7 +166,7 @@ app.post(
           main_id: user.main_id,
           main_handle: user.main_handle,
           followers_count: user.followers_count,
-          earning_rate: user.earning_rate,
+          earning_rate: earningRate(Number(user.followers_count)),
           arweave_address: user.arweave_address,
           photo_url: user.photo_url,
           medium: user.medium,
@@ -214,8 +213,6 @@ app.get("/twitter/users/me", async (req, res) => {
     }
 
     user.followers_count = userTwitter.followers_count;
-    user.earning_rate = earningRate(user.followers_count);
-
     const userUpdate = await db.updateUserInfo(user);
     if (userUpdate.length === 0) {
       throw new DBError("internal error", "[db]: could not update user");
@@ -234,7 +231,7 @@ app.get("/twitter/users/me", async (req, res) => {
       followers_count: user.followers_count || 0,
       arweave_address: user.arweave_address || "",
       tweets_count: Number(tweets[0].count) || 0,
-      earning_rate: user.earning_rate || 0,
+      earning_rate: earningRate(user.followers_count) || 0,
     });
   } catch (e) {
     return handleAPIError(e, res);

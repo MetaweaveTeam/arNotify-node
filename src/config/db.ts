@@ -165,7 +165,6 @@ export default {
         main_handle,
         medium,
         followers_count,
-        earning_rate,
         arweave_address,
         photo_url,
         oauth_access_token,
@@ -173,13 +172,12 @@ export default {
         oauth_secret_token,
         oauth_secret_token_iv
     )
-    VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING main_id, main_handle, followers_count, earning_rate, arweave_address, photo_url, medium`,
+    VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING main_id, main_handle, followers_count, arweave_address, photo_url, medium`,
       [
         user.main_id,
         user.main_handle,
         user.medium,
         user.followers_count,
-        user.earning_rate,
         user.arweave_address,
         user.photo_url,
         user.oauth_access_token,
@@ -198,7 +196,6 @@ export default {
       main_handle = ?,
       photo_url = ?,
       followers_count = ?,
-      earning_rate = ?,
       arweave_address = ?,
       oauth_access_token = ?,
       oauth_access_token_iv = ?,
@@ -210,7 +207,6 @@ export default {
         user.main_handle,
         user.photo_url,
         user.followers_count,
-        user.earning_rate,
         user.arweave_address,
         user.oauth_access_token,
         user.oauth_access_token_iv,
