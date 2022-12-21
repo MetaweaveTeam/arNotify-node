@@ -1,5 +1,4 @@
 import { User } from "../types";
-
 import mariadb from "mariadb";
 const env = process.env;
 
