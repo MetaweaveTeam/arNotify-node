@@ -4,6 +4,7 @@ import { getCookie } from "./config/http";
 import { TwitterApi, UserV1 } from "twitter-api-v2";
 import { encrypt } from "./crypto";
 import { earningRate } from "./config/twitter";
+import { readContract } from "smartweave";
 import start from "./cron";
 const https = require("https");
 const fs = require("fs");
@@ -223,6 +224,15 @@ app.get("/twitter/users/me", async (req, res) => {
       throw new DBError("internal error", "[db]: could not count tweets");
     }
 
+    const contractId = process.env.TOKEN_CONTRACT;
+
+    if (!contractId) {
+      throw new NotFoundError("contract_id", "internal error");
+    }
+
+    const contractState = await readContract(arweave, contractId);
+    const balance = contractState.balances[user.arweave_address];
+
     res.status(200).json({
       main_id: user.main_id,
       main_handle: user.main_handle,
@@ -232,6 +242,7 @@ app.get("/twitter/users/me", async (req, res) => {
       arweave_address: user.arweave_address || "",
       tweets_count: Number(tweets[0].count) || 0,
       earning_rate: earningRate(user.followers_count) || 0,
+      balance: balance || 5,
     });
   } catch (e) {
     return handleAPIError(e, res);
