@@ -269,6 +269,13 @@ app.post("/arweave/wallet", async (req, res) => {
       throw new DBError("internal error", "[db]: could not update user");
     }
 
+    const contractId = process.env.TOKEN_CONTRACT;
+    if (!contractId) {
+      throw new NotFoundError("contract_id", "internal error");
+    }
+
+    const contractState = await readContract(arweave, contractId);
+    const balance = contractState.balances[user.arweave_address];
     res.status(200).json({
       main_id: user.main_id,
       main_handle: user.main_handle,
@@ -277,6 +284,7 @@ app.post("/arweave/wallet", async (req, res) => {
       followers_count: user.followers_count || 0,
       arweave_address: user.arweave_address || "",
       earning_rate: user.earning_rate || 0,
+      balance: balance || 5,
     });
   } catch (e) {
     return handleAPIError(e, res);
