@@ -1,5 +1,4 @@
 import { User } from "../types";
-
 import mariadb from "mariadb";
 const env = process.env;
 
@@ -146,7 +145,7 @@ export default {
   SET
       is_active = 0
   WHERE
-      s.main_id = ? 
+      s.main_id = ?
       `,
       [twitterID]
     );
@@ -164,17 +163,21 @@ export default {
         main_id,
         main_handle,
         medium,
+        followers_count,
+        arweave_address,
         photo_url,
         oauth_access_token,
         oauth_access_token_iv,
         oauth_secret_token,
         oauth_secret_token_iv
     )
-    VALUES(?, ?, ?, ?, ?, ?, ?, ?) RETURNING main_id, main_handle, photo_url, medium`,
+    VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING main_id, main_handle, followers_count, arweave_address, photo_url, medium`,
       [
         user.main_id,
         user.main_handle,
         user.medium,
+        user.followers_count,
+        user.arweave_address,
         user.photo_url,
         user.oauth_access_token,
         user.oauth_access_token_iv,
@@ -191,6 +194,8 @@ export default {
       SET
       main_handle = ?,
       photo_url = ?,
+      followers_count = ?,
+      arweave_address = ?,
       oauth_access_token = ?,
       oauth_access_token_iv = ?,
       oauth_secret_token = ?,
@@ -200,6 +205,8 @@ export default {
       [
         user.main_handle,
         user.photo_url,
+        user.followers_count,
+        user.arweave_address,
         user.oauth_access_token,
         user.oauth_access_token_iv,
         user.oauth_secret_token,
@@ -233,6 +240,13 @@ export default {
     return await query(
       "INSERT INTO tweets (main_id, tweet_id, arweave_tx_id, protocol_name) VALUES (?, ?, ?, ?)",
       [twitterID, tweetID, arweave_tx_id, protocol]
+    );
+  },
+
+  countTweetsByTwitterID: async (twitterID: String) => {
+    return await query(
+      "SELECT COUNT(*) as count FROM tweets where tweets.main_id=?",
+      [twitterID]
     );
   },
 };

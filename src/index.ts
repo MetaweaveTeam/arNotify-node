@@ -3,6 +3,8 @@ import { Request, Response } from "express";
 import { getCookie } from "./config/http";
 import { TwitterApi, UserV1 } from "twitter-api-v2";
 import { encrypt } from "./crypto";
+import { earningRate } from "./config/twitter";
+import { readContract } from "smartweave";
 import start from "./cron";
 const https = require("https");
 const fs = require("fs");
@@ -128,6 +130,8 @@ app.post(
         let res = await db.createNewUser({
           main_id: twitterUserData.id_str,
           main_handle: twitterUserData.screen_name,
+          followers_count: twitterUserData.followers_count,
+          arweave_address: "",
           medium: "twitter",
           photo_url: twitterUserData.profile_image_url_https,
           oauth_access_token: encAccessToken.content,
@@ -162,6 +166,9 @@ app.post(
         {
           main_id: user.main_id,
           main_handle: user.main_handle,
+          followers_count: user.followers_count,
+          earning_rate: earningRate(Number(user.followers_count)),
+          arweave_address: user.arweave_address,
           photo_url: user.photo_url,
           medium: user.medium,
         } as UserCookie,
@@ -196,11 +203,88 @@ app.get("/twitter/users/me", async (req, res) => {
     }
 
     let user = userInfo[0];
+
+    const usersTwitter = await client.v1.users({
+      screen_name: user.main_handle,
+    });
+    const userTwitter = usersTwitter[0];
+
+    if (!userTwitter) {
+      throw new NotFoundError("user_by_twitter_handle", "internal error");
+    }
+
+    user.followers_count = userTwitter.followers_count;
+    const userUpdate = await db.updateUserInfo(user);
+    if (userUpdate.length === 0) {
+      throw new DBError("internal error", "[db]: could not update user");
+    }
+
+    let tweets = await db.countTweetsByTwitterID(user.main_id);
+    if (tweets.length === 0) {
+      throw new DBError("internal error", "[db]: could not count tweets");
+    }
+
+    const contractId = process.env.TOKEN_CONTRACT;
+
+    if (!contractId) {
+      throw new NotFoundError("contract_id", "internal error");
+    }
+
+    const contractState = await readContract(arweave, contractId);
+    const balance = contractState.balances[user.arweave_address];
+
     res.status(200).json({
       main_id: user.main_id,
       main_handle: user.main_handle,
       is_subscribed: user.is_subscribed,
       photo_url: user.photo_url,
+      followers_count: user.followers_count || 0,
+      arweave_address: user.arweave_address || "",
+      tweets_count: Number(tweets[0].count) || 0,
+      earning_rate: earningRate(user.followers_count) || 0,
+      balance: balance || 5,
+    });
+  } catch (e) {
+    return handleAPIError(e, res);
+  }
+});
+
+app.post("/arweave/wallet", async (req, res) => {
+  try {
+    const walletAddress = req.body.address;
+    if (!walletAddress) {
+      throw new NotFoundError("address", "address is required");
+    }
+
+    const userCookie = getCookie(req, USER_COOKIE);
+    let userInfo = await db.fetchUserInfoByTwitterID(userCookie.main_id);
+    if (userInfo.length === 0) {
+      throw new NotFoundError("user_by_twitter_id", "internal error");
+    }
+
+    let user = userInfo[0];
+    user.arweave_address = walletAddress;
+    const userUpdate = await db.updateUserInfo(user);
+    if (userUpdate.length === 0) {
+      throw new DBError("internal error", "[db]: could not update user");
+    }
+
+    const contractId = process.env.TOKEN_CONTRACT;
+    if (!contractId) {
+      throw new NotFoundError("contract_id", "internal error");
+    }
+
+    const contractState = await readContract(arweave, contractId);
+    const balance = contractState.balances[user.arweave_address];
+    res.status(200).json({
+      main_id: user.main_id,
+      main_handle: user.main_handle,
+      is_subscribed: user.is_subscribed,
+      photo_url: user.photo_url,
+      followers_count: user.followers_count || 0,
+      arweave_address: user.arweave_address || "",
+      earning_rate: user.earning_rate || 0,
+      balance: balance || 5,
     });
   } catch (e) {
     return handleAPIError(e, res);

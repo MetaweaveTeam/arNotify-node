@@ -10,7 +10,10 @@
     "prod.start": "docker-compose -f docker-compose.production.yml up -d",
     "prod.stop": "docker-compose -f docker-compose.production.yml down",
     "prod.build": "docker-compose -f docker-compose.production.yml build",
-    "prod.restart": "docker-compose -f docker-compose.production.yml restart"
+    "prod.restart": "docker-compose -f docker-compose.production.yml restart",
+    "sequelize": "sequelize",
+    "db:dev:migrate": "dotenv -e .env.dev -- npm run db:migrate",
+    "db:migrate": "sequelize db:migrate"
   },
   "repository": {
     "type": "git",
@@ -41,7 +44,10 @@
     "mariadb": "^3.0.2",
     "morgan": "^1.10.0",
     "node-cron": "3.0.0",
-    "twitter-api-v2": "^1.12.9"
+    "sequelize": "^6.28.0",
+    "smartweave": "^0.4.49",
+    "twitter-api-v2": "^1.12.9",
+    "warp-contracts": "^1.2.37"
   },
   "devDependencies": {
     "@types/cli-color": "^2.0.2",
@@ -53,6 +59,7 @@
     "concurrently": "^7.5.0",
     "dotenv-cli": "^6.0.0",
     "nodemon": "^2.0.20",
+    "sequelize-cli": "^6.5.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^4.9.0"
   }

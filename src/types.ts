@@ -2,6 +2,8 @@ export type User = {
   main_id: String;
   main_handle: String;
   medium: String;
+  followers_count: Number;
+  arweave_address: String;
   photo_url: String;
   oauth_access_token: String;
   oauth_access_token_iv: String;
@@ -12,6 +14,7 @@ export type User = {
 export type UserCookie = {
   main_id: String;
   main_handle: String;
+
   photo_url: String;
   medium: String;
 };

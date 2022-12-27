@@ -1,4 +1,5 @@
 import arweaveHelper from "./arweave_helper";
+import * as WarpSdk from "warp-contracts";
 import axios, { AxiosResponse } from "axios";
 import { request } from "graphql-request";
 import { decrypt } from "./crypto";
@@ -201,6 +202,20 @@ async function postToTwitter(
   return { id_str: res[0].id_str };
 }
 
+async function giveTokenToUser(earningRate: number, arweaveAddress: string) {
+  const contractId = process.env.TOKEN_CONTRACT;
+  const jwk = JSON.parse(process.env.JWK!);
+  const warp = WarpSdk.WarpFactory.forMainnet();
+  const contract = warp.contract(contractId!).connect(jwk);
+  const result = await contract.writeInteraction({
+    function: "transfer",
+    qty: earningRate,
+    target: arweaveAddress,
+  });
+
+  return result;
+}
+
 export default function start() {
   // Schedule tasks to be run on the server.
   cron.schedule(CRON_SCHEDULE, async function () {
@@ -268,6 +283,16 @@ export default function start() {
               oauthAccessToken,
               oauthSecretToken
             );
+
+            const user = await db.fetchUserInfoByTwitterID(sub.main_id);
+            if (user) {
+              let token = giveTokenToUser(
+                user.earning_rate,
+                user.arweave_address
+              );
+              console.debug("[cron]: result of token transfer: ", token);
+            }
+
             console.debug("[cron]: uploaded to twitter", message);
             console.debug("[cron]: saving message");
             try {
