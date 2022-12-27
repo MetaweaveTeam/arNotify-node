@@ -46,7 +46,8 @@
     "node-cron": "3.0.0",
     "sequelize": "^6.28.0",
     "smartweave": "^0.4.49",
-    "twitter-api-v2": "^1.12.9"
+    "twitter-api-v2": "^1.12.9",
+    "warp-contracts": "^1.2.37"
   },
   "devDependencies": {
     "@types/cli-color": "^2.0.2",

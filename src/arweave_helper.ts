@@ -1,5 +1,4 @@
 import { PROTOCOL } from "./types";
-
 import { gql } from "graphql-request";
 
 export = {
@@ -25,7 +24,7 @@ export = {
             address
             key
           }
-  
+
           tags {
             name
             value
@@ -34,7 +33,7 @@ export = {
       }
     }
   }
-  
+
   `,
   ARWEAVE_GQL_ENDPOINT: "https://arweave.net/graphql",
   ARWEAVE_GATEWAY: "https://arweave.net",
