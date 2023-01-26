@@ -7,6 +7,6 @@ module.exports = {
   password: env.DB_PASSWORD,
   database: env.DB_NAME,
   host: env.DB_HOST,
-  port: env.DB_PORT ? +env.DB_PORT : 3306,
+  port: env.DB_PORT ? env.DB_PORT : 3306,
   dialect: "mariadb",
 };
