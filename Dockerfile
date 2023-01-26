@@ -5,6 +5,7 @@ COPY src src/
 COPY package.json .
 COPY tsconfig.json .
 COPY .env.prod .env
+COPY .sequelizerc .
 
 # RUN npm config set unsafe-perm true
 RUN npm i

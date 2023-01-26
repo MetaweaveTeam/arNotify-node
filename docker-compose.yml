@@ -13,7 +13,7 @@ services:
     volumes:
       - mariadb:/var/lib/mariadb
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-  
+
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:5
     restart: always
@@ -24,7 +24,7 @@ services:
       PMA_PASSWORD: arnotify_root_password
     ports:
       - 4000:80
-    depends_on: 
+    depends_on:
       - db
 
 volumes:
